@@ -1,0 +1,112 @@
+2022-10-09 18:49:03,331 - apscheduler.scheduler - INFO - Scheduler started
+2022-10-09 18:49:03,332 - telegram.ext._application - INFO - Application started
+2022-10-09 18:53:36,788 - telegram.ext._application - ERROR - No error handlers are registered, logging exception.
+Traceback (most recent call last):
+  File "/home/pi/.local/lib/python3.7/site-packages/httpcore/backends/asyncio.py", line 112, in connect_tcp
+    local_host=local_address,
+  File "/home/pi/.local/lib/python3.7/site-packages/anyio/_core/_sockets.py", line 190, in connect_tcp
+    target_host, remote_port, family=family, type=socket.SOCK_STREAM
+  File "/home/pi/.local/lib/python3.7/site-packages/anyio/_core/_sockets.py", line 497, in getaddrinfo
+    encoded_host, port, family=family, type=type, proto=proto, flags=flags
+  File "/home/pi/.local/lib/python3.7/site-packages/anyio/_backends/_asyncio.py", line 1755, in getaddrinfo
+    host, port, family=family, type=type, proto=proto, flags=flags
+  File "/usr/lib/python3.7/asyncio/base_events.py", line 789, in getaddrinfo
+    None, getaddr_func, host, port, family, type, proto, flags)
+concurrent.futures._base.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/pi/.local/lib/python3.7/site-packages/httpcore/_exceptions.py", line 8, in map_exceptions
+    yield
+  File "/home/pi/.local/lib/python3.7/site-packages/httpcore/backends/asyncio.py", line 112, in connect_tcp
+    local_host=local_address,
+  File "/home/pi/.local/lib/python3.7/site-packages/anyio/_core/_tasks.py", line 118, in __exit__
+    raise TimeoutError
+TimeoutError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/pi/.local/lib/python3.7/site-packages/httpx/_transports/default.py", line 60, in map_httpcore_exceptions
+    yield
+  File "/home/pi/.local/lib/python3.7/site-packages/httpx/_transports/default.py", line 353, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+  File "/home/pi/.local/lib/python3.7/site-packages/httpcore/_async/connection_pool.py", line 253, in handle_async_request
+    raise exc
+  File "/home/pi/.local/lib/python3.7/site-packages/httpcore/_async/connection_pool.py", line 237, in handle_async_request
+    response = await connection.handle_async_request(request)
+  File "/home/pi/.local/lib/python3.7/site-packages/httpcore/_async/connection.py", line 86, in handle_async_request
+    raise exc
+  File "/home/pi/.local/lib/python3.7/site-packages/httpcore/_async/connection.py", line 63, in handle_async_request
+    stream = await self._connect(request)
+  File "/home/pi/.local/lib/python3.7/site-packages/httpcore/_async/connection.py", line 111, in _connect
+    stream = await self._network_backend.connect_tcp(**kwargs)
+  File "/home/pi/.local/lib/python3.7/site-packages/httpcore/backends/auto.py", line 30, in connect_tcp
+    host, port, timeout=timeout, local_address=local_address
+  File "/home/pi/.local/lib/python3.7/site-packages/httpcore/backends/asyncio.py", line 112, in connect_tcp
+    local_host=local_address,
+  File "/usr/lib/python3.7/contextlib.py", line 130, in __exit__
+    self.gen.throw(type, value, traceback)
+  File "/home/pi/.local/lib/python3.7/site-packages/httpcore/_exceptions.py", line 12, in map_exceptions
+    raise to_exc(exc)
+httpcore.ConnectTimeout
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/pi/.local/lib/python3.7/site-packages/telegram/request/_httpxrequest.py", line 180, in do_request
+    data=data,
+  File "/home/pi/.local/lib/python3.7/site-packages/httpx/_client.py", line 1527, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+  File "/home/pi/.local/lib/python3.7/site-packages/httpx/_client.py", line 1618, in send
+    history=[],
+  File "/home/pi/.local/lib/python3.7/site-packages/httpx/_client.py", line 1645, in _send_handling_auth
+    history=history,
+  File "/home/pi/.local/lib/python3.7/site-packages/httpx/_client.py", line 1679, in _send_handling_redirects
+    response = await self._send_single_request(request)
+  File "/home/pi/.local/lib/python3.7/site-packages/httpx/_client.py", line 1716, in _send_single_request
+    response = await transport.handle_async_request(request)
+  File "/home/pi/.local/lib/python3.7/site-packages/httpx/_transports/default.py", line 353, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+  File "/usr/lib/python3.7/contextlib.py", line 130, in __exit__
+    self.gen.throw(type, value, traceback)
+  File "/home/pi/.local/lib/python3.7/site-packages/httpx/_transports/default.py", line 77, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ConnectTimeout
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/pi/.local/lib/python3.7/site-packages/telegram/ext/_application.py", line 983, in process_update
+    await coroutine
+  File "/home/pi/.local/lib/python3.7/site-packages/telegram/ext/_handler.py", line 137, in handle_update
+    return await self.callback(update, context)
+  File "/home/pi/hell/daemons/Telegram Words/bot.py", line 129, in play
+    await update.message.reply_text(reply_text)
+  File "/home/pi/.local/lib/python3.7/site-packages/telegram/_message.py", line 815, in reply_text
+    api_kwargs=api_kwargs,
+  File "/home/pi/.local/lib/python3.7/site-packages/telegram/_bot.py", line 236, in decorator
+    result = await func(*args, **kwargs)
+  File "/home/pi/.local/lib/python3.7/site-packages/telegram/_bot.py", line 653, in send_message
+    api_kwargs=api_kwargs,
+  File "/home/pi/.local/lib/python3.7/site-packages/telegram/ext/_extbot.py", line 266, in _send_message
+    api_kwargs=api_kwargs,
+  File "/home/pi/.local/lib/python3.7/site-packages/telegram/_bot.py", line 353, in _send_message
+    api_kwargs=api_kwargs,
+  File "/home/pi/.local/lib/python3.7/site-packages/telegram/_bot.py", line 315, in _post
+    pool_timeout=pool_timeout,
+  File "/home/pi/.local/lib/python3.7/site-packages/telegram/request/_baserequest.py", line 169, in post
+    pool_timeout=pool_timeout,
+  File "/home/pi/.local/lib/python3.7/site-packages/telegram/request/_baserequest.py", line 285, in _request_wrapper
+    raise exc
+  File "/home/pi/.local/lib/python3.7/site-packages/telegram/request/_baserequest.py", line 278, in _request_wrapper
+    pool_timeout=pool_timeout,
+  File "/home/pi/.local/lib/python3.7/site-packages/telegram/request/_httpxrequest.py", line 191, in do_request
+    raise TimedOut from err
+telegram.error.TimedOut: Timed out
+2022-10-09 22:08:28,286 - telegram.ext._application - INFO - Application is stopping. This might take a moment.
+2022-10-09 22:08:28,287 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2022-10-09 22:08:28,298 - telegram.ext._application - INFO - Application.stop() complete
+2022-10-09 22:10:22,688 - apscheduler.scheduler - INFO - Scheduler started
+2022-10-09 22:10:22,689 - telegram.ext._application - INFO - Application started
