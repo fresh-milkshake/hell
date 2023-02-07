@@ -5,7 +5,7 @@ import psutil
 from loguru import logger
 from typing import List, Tuple
 
-PROJECT_PATH = os.path.dirname(os.path.realpath(__file__))
+from constants import *
 
 logger.add(sink=os.path.join(PROJECT_PATH, "hell.log"),
            format="{time} {level} {message}",
@@ -37,15 +37,20 @@ class Daemon:
     requirements_command = 'pip3 install -r '
     python_command = 'python3'
 
-    def __init__(self, name: str, target_path: str, daemon_dir: str) -> None:
+    def __init__(self,
+                 name: str,
+                 target_path: str,
+                 daemon_dir: str,
+                 requirements_path: str = '') -> None:
+
         self.name = name
         self.target_path = target_path
         self.daemon_dir = daemon_dir
-        self.requirements_path = daemon_dir + "/requirements.txt"
+        self.requirements_path = daemon_dir + "/requirements.txt" if not requirements_path else requirements_path
 
         self.dependancies_installed = False
-        self.pid = -1
         self.deploy_time = 0
+        self.pid = -1
 
     def get_dependencies(self) -> List[str]:
         ''' Return a list of dependencies for the daemon '''
@@ -53,7 +58,7 @@ class Daemon:
             f"Opening {self.requirements_path.split('/daemons/')[-1]} to get dependencies..."
         )
         if os.path.exists(self.requirements_path):
-            with open(self.requirements_path, 'r') as f:
+            with open(self.requirements_path, 'r', encoding=ENCODING) as f:
                 return f.read().splitlines()
         else:
             return 'No requirements found for this daemon'
@@ -115,16 +120,13 @@ class Daemon:
                     f"Successfully deployed {self.name} with PID {self.pid}")
                 self.deploy_time = time.time()
                 return True
-        else:
-            logger.error(f"Failed to deploy {self.name}")
-            return False
+
+        logger.error(f"Failed to deploy {self.name}")
+        return False
 
 
 class Hell:
     ''' Class "Manager" for daemons deployment and killing '''
-    DAEMONS_PATH = os.path.join(PROJECT_PATH, "daemons")
-    CONFIG_PATH = os.path.join(PROJECT_PATH, "daemons.yaml")
-    SLEEP_TIME = 60 * 20
 
     def __init__(self, autostart_enabled=False) -> None:
         self.daemons: List[Daemon] = []
@@ -138,10 +140,10 @@ class Hell:
                 logger.critical("No daemons loaded")
                 return
             self.watch()
-        except KeyboardInterrupt as e:
+        except KeyboardInterrupt:
             pass
-        except Exception as e:
-            logger.exception(e)
+        except Exception as err:
+            logger.exception(err)
         working_time = time.time() - self.start_time
         logger.info(
             f"Ending session...Working time: {time.strftime('%H:%M:%S', time.gmtime(working_time))}"
@@ -156,11 +158,11 @@ class Hell:
 
     @property
     def stale_daemons(self) -> List[Daemon]:
-        ''' Return a list of daemons that are not running '''
+        ''' Return a list of daemons that are not running already '''
         return [d for d in self.daemons if d.pid == -1]
 
     def watch(self):
-        ''' watach for currently running daemons '''
+        ''' Watch for currently running daemons and check their state '''
         while 1:
             deployed_daemons = []
             available_daemons = get_hell_pids(only_pids=True)
@@ -185,12 +187,12 @@ class Hell:
                     else:
                         logger.warning(
                             f"Daemon {daemon.name} is not longer running...")
-                        
+
             if len(self.running_daemons) == 0:
                 logger.warning("No daemons running...")
                 return
 
-            time.sleep(Hell.SLEEP_TIME)
+            time.sleep(WATCHER_SLEEP_TIME)
 
     def log_daemons(self) -> None:
         ''' Log a list of daemons '''
@@ -200,40 +202,41 @@ class Hell:
             logger.debug(
                 f"Requirements: {', '.join(daemon.get_dependencies()) if daemon.dependancies_installed else 'No requirements'}")
             logger.debug(
-                f"Deploiement time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(daemon.deploy_time))}"
+                f"Deploiement timestamp: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(daemon.deploy_time))}"
             )
             # running_time = time.time() - daemon.deploy_time
             # logger.debug(f"Running time: {time.strftime('%H:%M:%S', time.gmtime(running_time))}")
 
     def load_config(self) -> dict:
         ''' Load the config file '''
-        if not os.path.exists(Hell.CONFIG_PATH):
-            logger.critical(f"Config file not found at {Hell.CONFIG_PATH}")
+        if not os.path.exists(DAEMONS_CONFIG_PATH):
+            logger.critical(f"Config file not found at {DAEMONS_CONFIG_PATH}")
             return {}
-        
-        with open(Hell.CONFIG_PATH, "r") as f:
+
+        with open(DAEMONS_CONFIG_PATH, "r", encoding=ENCODING) as f:
             config = yaml.load(f, Loader=yaml.FullLoader)
-            
+
         if config in [None, {}]:
-            logger.critical(f"Config file is empty")
+            logger.critical("Config file is empty")
             return {}
-        
+
         return config
 
-    def load_daemons(self, path: str = DAEMONS_PATH) -> None:
+    def load_daemons(self, daemons_path: str = DAEMONS_PATH) -> None:
         ''' Load daemons from a given path '''
         config = self.load_config()
         if config == {}:
             return
-        
+
         autostart = []
         for daemon_name in config["daemons"]:
-            daemon = config["daemons"][daemon_name]
-            ddir = path + daemon["dir"]
-            target_path = ddir + daemon["target"]
-            self.add_daemon(Daemon(daemon['name'], target_path, ddir))
-            if daemon["autostart"]:
-                autostart.append(daemon["name"])
+            daemon_config = config["daemons"][daemon_name]
+            daemon_directory = daemons_path + daemon_config["dir"]
+            target_path = daemon_directory + daemon_config["target"]
+            self.add_daemon(
+                Daemon(daemon_config['name'], target_path, daemon_directory))
+            if daemon_config["autostart"]:
+                autostart.append(daemon_config["name"])
         logger.success(f"Successfully loaded {len(self.daemons)} daemons")
 
         if self.autostart_enabled:
@@ -256,7 +259,6 @@ class Hell:
         success = daemon.deploy()
         if not success:
             return False
-
 
         self.deployed_daemons.append(daemon)
         return True

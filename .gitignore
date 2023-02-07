@@ -170,3 +170,4 @@ venv.bak/
 # Spyder
 
 daemons/
+*.log
