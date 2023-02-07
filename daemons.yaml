@@ -1,0 +1,5 @@
+
+daemons:
+  test-1:
+    dir: ''
+    target: infinite-daemon.py
