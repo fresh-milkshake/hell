@@ -1,0 +1,24 @@
+Telegram Chatbot:
+  arguments: ''
+  auto-restart: false
+  dir: Telegram Chatbot
+  requirements: requirements.txt
+  target: main.py
+Telegram Words:
+  arguments: ''
+  auto-restart: false
+  dir: Telegram Words
+  requirements: requirements.txt
+  target: main.py
+test1:
+  arguments: ''
+  auto-restart: false
+  dir: test1
+  requirements: requirements.txt
+  target: main.py
+wifi-cache:
+  arguments: ''
+  auto-restart: false
+  dir: wifi-cache
+  requirements: requirements.txt
+  target: main.py

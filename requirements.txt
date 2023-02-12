@@ -1,3 +1,5 @@
 loguru
 pyyaml
 psutil
+click
+rich
