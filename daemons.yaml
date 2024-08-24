@@ -1,24 +1,23 @@
-
 daemons:
-  Telegram Chatbot:
-    auto-restart: false
-    dir: Telegram Chatbot
-    requirements: default
-    target: bot.py
-  Telegram Words:
-    auto-restart: false
-    dir: Telegram Words
-    requirements: default
-    target: bot.py
-  test1:
-    auto-restart: false
-    dir: test1
-    target: infinite-daemon.py
-  # wifi-cache:
-  #   auto-restart: false
-  #   dir: wifi-cache
-  #   requirements: requirements.txt
-  #   target: main.py
+    Telegram Chatbot:
+        auto-restart: false
+        dir: Telegram Chatbot
+        requirements: default
+        target: bot.py
+    Telegram Words:
+        auto-restart: false
+        dir: Telegram Words
+        requirements: default
+        target: bot.py
+    example:
+        auto-restart: true
+        dir: example
+        target: target.py
+    # wifi-cache:
+    #   auto-restart: false
+    #   dir: wifi-cache
+    #   requirements: requirements.txt
+    #   target: main.py
 default-venv: true
 # default:
 #   auto-restart: false
