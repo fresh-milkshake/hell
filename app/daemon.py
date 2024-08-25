@@ -162,7 +162,19 @@ class Daemon:
             constants.CMD_DAEMON,
             *constants.CMD_TO_DEV_NULL,
         ]
-        self._process = subprocess.Popen(command)
+
+        try:
+            self._process = subprocess.Popen(command)
+        except FileNotFoundError as e:
+            logger.error(
+                f"Failed to deploy '{self.name}' because python3 can't be found on this device"
+            )
+            return False
+        except Exception as e:
+            logger.critical(f"System encountered unknown error")
+            logger.exception(e)
+            return False
+
         if self._process.poll():
             logger.error(
                 f"Failed to deploy {self.name} [daemon returned code {self._process.returncode}]"

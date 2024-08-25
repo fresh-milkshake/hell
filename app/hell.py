@@ -16,33 +16,20 @@ class Hell:
     def __init__(self, autostart_enabled=False) -> None:
         self.daemons: List[Daemon] = []
         self.deployed_daemons: List[Daemon] = []
-        self.auto_restart_enabled = autostart_enabled
         self.auto_restart_list: List[Daemon] = []
         self.pending_for_restart: List[Daemon] = []
+        
+        self.auto_restart_enabled = autostart_enabled
         self.start_time = time.time()
 
         config = self.load_config()
-        if config == {}:
+        self.update_constants(config)
+        if not self.run_daemons(config):
+            logger.info("Shutting down...")
             return
 
-        self.update_constants(config)
-        self.load_daemons(config)
-
-        try:
-            if len(self.daemons) == 0:
-                logger.info("No daemons loaded")
-                return
-            self.watch()
-        except KeyboardInterrupt:
-            pass
-        except Exception as err:
-            logger.exception(err)
-
-        working_time = time.time() - self.start_time
-        logger.info(
-            f"Ending session...Working time: {time.strftime('%H:%M:%S', time.gmtime(working_time))}"
-        )
-        self.log_daemons()
+        self.enter_waiting_stage()
+        self.log_daemons_data()
         self.kill_all()
 
     @property
@@ -54,6 +41,26 @@ class Hell:
     def stale_daemons(self) -> List[Daemon]:
         """Return a list of daemons that are not running already"""
         return [d for d in self.daemons if d.pid == -1]
+
+    @property
+    def daemons_count(self) -> int:
+        return len(self.daemons)
+
+    def enter_waiting_stage(self):
+        try:
+            if len(self.daemons) == 0:
+                logger.info("No daemons loaded")
+                return
+            self.watch()
+        except KeyboardInterrupt:
+            logger.info("System stopped manually [CTRL+C]")
+        except Exception as err:
+            logger.exception(err)
+
+        working_time = time.time() - self.start_time
+        logger.info(
+            f"Ending session...Working time: {time.strftime('%H:%M:%S', time.gmtime(working_time))}"
+        )
 
     def watch(self):
         """Watch for currently running daemons and check their state"""
@@ -86,7 +93,7 @@ class Hell:
 
             time.sleep(constants.WATCHER_SLEEP_TIME)
 
-    def log_daemons(self) -> None:
+    def log_daemons_data(self) -> None:
         """Log a list of daemons"""
         for daemon in self.daemons:
             daemon.log_information()
@@ -208,14 +215,14 @@ class Hell:
 
         return daemon
 
-    def load_daemons(
+    def run_daemons(
         self, config: dict, daemons_path: str = constants.DAEMONS_PATH
     ) -> None:
         """Load daemons from a given path"""
 
         if not config["daemons"]:
             logger.warning("No daemons configs found")
-            return
+            return False
 
         for daemon_name in config["daemons"]:
             daemon_config = config["daemons"][daemon_name]
@@ -229,10 +236,11 @@ class Hell:
 
         if not count:
             logger.warning("System encountered problems while checking daemons data")
-            return
+            return False
 
         logger.info(f"Loaded {count} daemons")
-        self.deploy_all()
+
+        return self.deploy_all()
 
     def add_daemon(self, daemon: Daemon) -> None:
         """Add a daemon to the list of daemons"""
@@ -257,19 +265,27 @@ class Hell:
         """Deploy all daemons"""
         if not self.daemons:
             logger.critical("No daemons loaded for deploing")
+            return
 
         errors = 0
 
         for daemon in self.daemons:
-            errors += int(~daemon.deploy())
+            errors += not daemon.deploy()
         errors = abs(errors)
 
-        if errors == 0:
-            logger.success("System initialized and deployed all daemons")
-        else:
-            logger.error(
-                f"System encountered {errors} failures and deployed {len(self.daemons) - errors} daemons"
+        if not errors:
+            logger.success(
+                f"System initialized and deployed all daemons ({self.daemons_count})"
             )
+        else:
+            logger.info(
+                f"System encountered {errors} failure(s) and deployed {self.daemons_count - errors} daemon(s)"
+            )
+
+        if errors == self.daemons_count:
+            return False
+
+        return True
 
     def kill_daemon(self, target_name: str) -> bool:
         """Kill a daemon"""
