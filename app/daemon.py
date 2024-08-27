@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import subprocess
 import time
 from typing import List
@@ -11,15 +12,16 @@ from app import utils, constants
 class Daemon:
     """Class for running the daemon"""
 
-    requirements_command = "pip3 install -r "
-    python_command = "python3"
+    requirements_command = f"{constants.CMD_PIP} install -r "
+    python_command = constants.CMD_PYTHON
 
     def __init__(
         self,
         name: str,
         target_path: str,
-        daemon_dir: str,
-        requirements_path: str,
+        daemon_dir: Path,
+        requirements_needed: bool,
+        requirements_path: Path,
         arguments: str = "",
         auto_restart: bool = False,
         use_virtualenv: bool = True,
@@ -31,6 +33,10 @@ class Daemon:
         :param daemon_dir: path to the daemon directory
         :param requirements_path: path to the requirements file
         """
+
+        assert isinstance(daemon_dir, Path)
+        if requirements_needed:
+            assert isinstance(requirements_path, Path)
 
         self.name = name
         self.target_path = target_path
@@ -44,9 +50,7 @@ class Daemon:
         self.deployed_once = False
         self.deploy_time = 0
 
-        self.virtualenv_path = os.path.join(
-            self.daemon_dir, constants.DEFAULT_VIRTUAL_ENV_NAME
-        )
+        self.virtualenv_path = self.daemon_dir / constants.DEFAULT_VIRTUAL_ENV_NAME
 
         self._process: subprocess.Popen | None = None
 
@@ -59,11 +63,9 @@ class Daemon:
 
     def get_dependencies(self) -> List[str] | str:
         """Return a list of dependencies for the daemon"""
-        logger.debug(
-            f'Opening "{self.requirements_path.split(constants.DAEMONS_PATH)[-1]}" to get dependencies...'
-        )
+        logger.debug(f'Opening "{self.requirements_path.name}" to get dependencies...')
 
-        if not os.path.exists(self.requirements_path):
+        if not self.requirements_path.exists():
             logger.exception(
                 f'Requirements file not found at "{self.requirements_path}"'
             )
@@ -79,13 +81,13 @@ class Daemon:
 
     def create_virtualenv(self) -> bool:
         """Create a virtualenv for the daemon, and return True if successful"""
-        logger.info(f"Creating virtualenv for {self.name}...")
-
-        if os.path.exists(self.virtualenv_path):
+        if self.virtualenv_path.exists():
             logger.warning(
                 f"Virtualenv for {self.name} already exists, skipping creation"
             )
             return True
+
+        logger.info(f"Creating virtualenv for {self.name}...")
         command = [constants.CMD_PYTHON, "-m", "venv", self.virtualenv_path]
         code, _ = utils.execute_command(command)
         if code != 0:

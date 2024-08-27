@@ -12,21 +12,25 @@ class LogLevel:
     CRITICAL = "CRITICAL"
 
 
+# General settings
 ENCODING = "utf-8"
 WATCHER_SLEEP_TIME = 60 * 20  # in seconds
 
+# Project paths
 PROJECT_PATH = Path(__file__).resolve().parent.parent
 DAEMONS_CONFIG_PATH = PROJECT_PATH / "daemons.yaml"
 DAEMONS_PATH = PROJECT_PATH / "daemons"
 
-DEFAULT_REQUIREMENTS_PATH = "requirements.txt"
-DEFAULT_TARGET_PATH = "main.py"
+# Default settings
+DEFAULT_REQUIREMENTS_PATH = Path("requirements.txt")
+DEFAULT_TARGET_PATH = Path("main.py")
 DEFAULT_AUTO_RESTART = False
 DEFAULT_USE_VIRTUAL_ENV = False
-DEFAULT_VIRTUAL_ENV_NAME = "venv"
+DEFAULT_VIRTUAL_ENV_NAME = Path("venv")
 DEFAULT_ARGUMENTS = ""
 IGNORE_REQUIREMENTS_SETTING = "-"
 
+# Logging settings
 LOG_LEVEL = LogLevel.DEBUG
 LOG_FORMAT_STRING = (
     "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | "
@@ -36,10 +40,11 @@ LOG_FORMAT_STRING = (
 LOG_FILE_NAME = "hell.log"
 LOG_FILE_PATH = PROJECT_PATH / LOG_FILE_NAME
 
+# Command settings
 CMD_TO_DEV_NULL = [">", "/dev/null"]
 CMD_DAEMON = "&"
-CMD_PIP = "pip3"
-CMD_PYTHON = "python3"
+CMD_PYTHON = "python"
+CMD_PIP = f"{CMD_PYTHON} -m pip"
 CMD_VENV_PYTHON_PATH = Path("bin") / "python"
 CMD_VENV_PIP_PATH = Path("bin") / "pip"
 CMD_VENV_PIP_INSTALL = ["install", "-r"]

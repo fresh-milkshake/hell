@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import time
 from typing import List
 
@@ -18,7 +19,7 @@ class Hell:
         self.deployed_daemons: List[Daemon] = []
         self.auto_restart_list: List[Daemon] = []
         self.pending_for_restart: List[Daemon] = []
-        
+
         self.auto_restart_enabled = autostart_enabled
         self.start_time = time.time()
 
@@ -171,33 +172,36 @@ class Hell:
         """
 
         daemon_directory = config.get("dir", name)
-        daemon_directory = os.path.join(constants.DAEMONS_PATH, daemon_directory)
-        if not os.path.exists(daemon_directory):
+        daemon_directory: Path = constants.DAEMONS_PATH / daemon_directory
+        if not daemon_directory.exists():
             logger.warning(f'Daemon directory "{daemon_directory}" not found')
             return None
 
         target = config.get("target", constants.DEFAULT_TARGET_PATH)
-        target = os.path.join(constants.DAEMONS_PATH, daemon_directory, target)
-        if not os.path.exists(target):
+        target: Path = daemon_directory / target
+        if not target.exists():
             logger.critical(f"Target file {target} not found")
             return None
 
-        requirements = config.get("requirements", constants.IGNORE_REQUIREMENTS_SETTING)
+        requirements: Path | str = config.get(
+            "requirements", constants.IGNORE_REQUIREMENTS_SETTING
+        )
+        requirements_needed = True
         if requirements != constants.IGNORE_REQUIREMENTS_SETTING:
             if requirements == "default":
-                requirements = os.path.join(
-                    constants.DAEMONS_PATH,
-                    daemon_directory,
-                    constants.DEFAULT_REQUIREMENTS_PATH,
+                requirements = (
+                    constants.DAEMONS_PATH
+                    / daemon_directory
+                    / constants.DEFAULT_REQUIREMENTS_PATH
                 )
             else:
-                requirements = os.path.join(
-                    constants.DAEMONS_PATH, daemon_directory, requirements
-                )
+                requirements = constants.DAEMONS_PATH / daemon_directory / requirements
 
-            if not os.path.exists(requirements):
+            if not requirements.exists():
                 logger.warning(f'Requirements file "{requirements}" not found')
                 return None
+        else:
+            requirements_needed = False
 
         arguments = config.get("arguments", constants.DEFAULT_ARGUMENTS)
         auto_restart = config.get("auto-restart", constants.DEFAULT_AUTO_RESTART)
@@ -207,6 +211,7 @@ class Hell:
             name,
             target,
             daemon_directory,
+            requirements_needed,
             requirements,
             arguments,
             auto_restart,
@@ -216,7 +221,7 @@ class Hell:
         return daemon
 
     def run_daemons(
-        self, config: dict, daemons_path: str = constants.DAEMONS_PATH
+        self, config: dict
     ) -> None:
         """Load daemons from a given path"""
 
