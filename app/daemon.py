@@ -18,7 +18,7 @@ class Daemon:
     def __init__(
         self,
         name: str,
-        target_path: str,
+        target_path: Path,
         daemon_dir: Path,
         requirements_needed: bool,
         requirements_path: Path,
@@ -35,6 +35,7 @@ class Daemon:
         """
 
         assert isinstance(daemon_dir, Path)
+        assert isinstance(target_path, Path)
         if requirements_needed:
             assert isinstance(requirements_path, Path)
 
@@ -155,9 +156,7 @@ class Daemon:
                 )
                 return False
 
-        python_command = os.path.join(
-            self.virtualenv_path, constants.CMD_VENV_PYTHON_PATH
-        )
+        python_command = self.virtualenv_path / constants.CMD_VENV_PYTHON_PATH
         command = [
             python_command,
             self.target_path,
@@ -184,6 +183,7 @@ class Daemon:
             return False
 
         for pid, path in utils.get_hell_pids():
+            logger.debug(f'{pid}, {path}, {self.target_path}, {self.pid}, {path == self.target_path}, {pid == self.pid}')
             if path == self.target_path and pid == self.pid:
                 logger.success(f"Successfully deployed {self.name} with PID {self.pid}")
                 self.deploy_time = time.time()

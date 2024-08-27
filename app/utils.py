@@ -51,7 +51,7 @@ def get_hell_pids(
         except psutil.NoSuchProcess:
             continue
         
-        if pinfo["name"] == "python3" and len(pinfo["cmdline"]) > 1:
+        if pinfo["name"] == constants.CMD_PYTHON and len(pinfo["cmdline"]) > 1:
             file = pinfo["cmdline"][1]
             if file.startswith(path_prefix):
                 pids.append(pinfo["pid"] if only_pids else (pinfo["pid"], file))
