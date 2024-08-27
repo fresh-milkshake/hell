@@ -254,16 +254,6 @@ class Hell:
         self.daemons.append(daemon)
         logger.success(f'Loaded "{daemon.name}" daemon')
 
-    def init_daemon(self, target_name: str) -> bool:
-        """Initialize a daemon"""
-        daemon = next(filter(lambda d: d.name == target_name, self.daemons))
-        success = daemon.deploy()
-        if not success:
-            return False
-
-        self.deployed_daemons.append(daemon)
-        return True
-
     def deploy_all(self) -> None:
         """Deploy all daemons"""
         if not self.daemons:
@@ -273,7 +263,13 @@ class Hell:
         errors = 0
 
         for daemon in self.daemons:
-            errors += not daemon.deploy()
+            error = not daemon.deploy()
+            
+            if not error:
+                self.deployed_daemons.append(daemon)
+                
+            errors += error
+            
         errors = abs(errors)
 
         if not errors:
