@@ -184,9 +184,6 @@ class Daemon:
 
         target = self.target_path.as_posix()
         for pid, path in utils.get_hell_pids():
-            logger.debug(
-                f"{pid}, {path}, {self.target_path}, {self.pid}, {path == self.target_path}, {pid == self.pid}"
-            )
             if path == target and pid == self.pid:
                 logger.success(f"Successfully deployed {self.name} with PID {self.pid}")
                 self.deploy_time = time.time()
