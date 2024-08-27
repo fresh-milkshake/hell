@@ -1,6 +1,7 @@
 """ Global constants for the project. """
 
 from pathlib import Path
+from datetime import timedelta
 
 
 class LogLevel:
@@ -14,7 +15,7 @@ class LogLevel:
 
 # General settings
 ENCODING = "utf-8"
-WATCHER_SLEEP_TIME = 60 * 20  # in seconds
+WATCHER_SLEEP_TIME = timedelta(minutes=1)
 
 # Project paths
 PROJECT_PATH = Path(__file__).resolve().parent.parent

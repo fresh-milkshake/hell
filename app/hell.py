@@ -92,7 +92,7 @@ class Hell:
                 logger.warning("No daemons running...")
                 return
 
-            time.sleep(constants.WATCHER_SLEEP_TIME)
+            time.sleep(constants.WATCHER_SLEEP_TIME.total_seconds())
 
     def log_daemons_data(self) -> None:
         """Log a list of daemons"""
