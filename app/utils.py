@@ -7,14 +7,16 @@ from app import constants
 
 
 def execute_command(
-    command_sequence: List[str], 
-    show_output: bool = False, 
-    exception_on_error: bool = False
+    command_sequence: List[str],
+    show_output: bool = False,
+    exception_on_error: bool = False,
 ) -> Tuple[int, str]:
     """Execute a command sequence and return the exit code and the output."""
     if not isinstance(command_sequence, list):
-        raise TypeError(f"Command sequence must be a list, not {type(command_sequence).__name__}")
-    
+        raise TypeError(
+            f"Command sequence must be a list, not {type(command_sequence).__name__}"
+        )
+
     process = subprocess.Popen(
         command_sequence,
         stdout=subprocess.PIPE if show_output else subprocess.DEVNULL,
@@ -24,10 +26,10 @@ def execute_command(
 
     output = []
     if show_output and process.stdout:
-        for line in iter(process.stdout.readline, ''):
+        for line in iter(process.stdout.readline, ""):
             output.append(line.strip())
             print(line.strip())
-    
+
     process.wait()
     code = process.returncode
     full_output = "\n".join(output)
@@ -40,8 +42,7 @@ def execute_command(
 
 
 def get_hell_pids(
-    path_prefix: str = str(constants.DAEMONS_PATH), 
-    only_pids: bool = False
+    path_prefix: str = str(constants.DAEMONS_PATH), only_pids: bool = False
 ) -> Union[List[int], List[Tuple[int, str]]]:
     """Return list of 'Hell' pids."""
     pids = []
@@ -50,7 +51,7 @@ def get_hell_pids(
             pinfo = proc.info
         except psutil.NoSuchProcess:
             continue
-        
+
         if pinfo["name"] == constants.CMD_PYTHON and len(pinfo["cmdline"]) > 1:
             file = pinfo["cmdline"][1]
             if file.startswith(path_prefix):

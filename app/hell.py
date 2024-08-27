@@ -220,9 +220,7 @@ class Hell:
 
         return daemon
 
-    def run_daemons(
-        self, config: dict
-    ) -> None:
+    def run_daemons(self, config: dict) -> None:
         """Load daemons from a given path"""
 
         if not config["daemons"]:
