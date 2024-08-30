@@ -1,7 +1,9 @@
 """ Utility functions for the 'Hell' project. """
 
+import os
 import subprocess
 from typing import List, Tuple, Union
+from loguru import logger
 import psutil
 from app import constants
 
@@ -57,3 +59,13 @@ def get_hell_pids(
             if file.startswith(path_prefix):
                 pids.append(pinfo["pid"] if only_pids else (pinfo["pid"], file))
     return pids
+
+
+def send_signal(pid: int, signal: int) -> bool:
+    """Send a signal to a process."""
+    try:
+        os.kill(pid, signal)
+        return True
+    except OSError as e:
+        logger.error(f"Failed to send signal {signal} to process {pid}: {e}")
+        return False

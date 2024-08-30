@@ -14,13 +14,12 @@ from app.daemon import Daemon
 class Hell:
     """Class "Manager" for daemons deployment and killing"""
 
-    def __init__(self, autostart_enabled=False) -> None:
+    def __init__(self) -> None:
         self.daemons: List[Daemon] = []
         self.deployed_daemons: List[Daemon] = []
         self.auto_restart_list: List[Daemon] = []
         self.pending_for_restart: List[Daemon] = []
 
-        self.auto_restart_enabled = autostart_enabled
         self.start_time = time.time()
 
         config = self.load_config()
@@ -36,12 +35,12 @@ class Hell:
     @property
     def running_daemons(self) -> List[Daemon]:
         """Return a list of currently running daemons"""
-        return [d for d in self.daemons if d.pid != -1]
+        return [d for d in self.daemons if d.PID != -1]
 
     @property
     def stale_daemons(self) -> List[Daemon]:
         """Return a list of daemons that are not running already"""
-        return [d for d in self.daemons if d.pid == -1]
+        return [d for d in self.daemons if d.PID == -1]
 
     @property
     def daemons_count(self) -> int:
@@ -63,21 +62,45 @@ class Hell:
             f"Ending session...Working time: {time.strftime('%H:%M:%S', time.gmtime(working_time))}"
         )
 
+    def deploy_daemon(self, daemon: Daemon) -> bool:
+        success = daemon.deploy()
+
+        if success:
+            daemon.failed_starts = 0
+            logger.success(f"'{daemon.name}' started [PID {daemon.PID}]")
+            self.deployed_daemons.append(daemon)
+        else:
+            daemon.failed_starts += 1
+            logger.warning(f"Can't start '{daemon.name}'")
+
+        return success
+
+    def restart_stale_daemons(self):
+        for daemon in self.stale_daemons:
+            if (
+                daemon.auto_restart
+                and daemon.failed_starts < constants.MAX_FAILED_STARTS
+            ):
+                logger.info(f"Restarting daemon '{daemon.name}'...")
+                self.deploy_daemon(daemon)
+
     def watch(self):
         """Watch for currently running daemons and check their state"""
         while 1:
+            self.restart_stale_daemons()
+
             deployed_daemons = []
             available_daemons = utils.get_hell_pids(only_pids=True)
             for deployed_daemon in self.deployed_daemons:
-                if deployed_daemon.pid in available_daemons:
+                if deployed_daemon.PID in available_daemons:
                     deployed_daemons.append(deployed_daemon)
-                    logger.success(
-                        f"Daemon {deployed_daemon.name} still running with PID {deployed_daemon.pid}..."
+                    logger.info(
+                        f"Daemon {deployed_daemon.name} still running with PID {deployed_daemon.PID}..."
                     )
                 else:
-                    deployed_daemon.pid = -1
+                    deployed_daemon.PID = -1
                     logger.warning(
-                        f"Daemon {deployed_daemon.name} with PID {deployed_daemon.pid} is no longer running..."
+                        f"Daemon {deployed_daemon.name} (last PID {deployed_daemon.PID}) is no longer running..."
                     )
 
             self.deployed_daemons = deployed_daemons
@@ -98,8 +121,6 @@ class Hell:
         """Log a list of daemons"""
         for daemon in self.daemons:
             daemon.log_information()
-            # running_time = time.time() - daemon.deploy_time
-            # logger.debug(f"Running time: {time.strftime('%H:%M:%S', time.gmtime(running_time))}")
 
     def update_constants(self, config: dict) -> None:
         """Updates global constants like DAEMONS_PATH and other based on config dict.
@@ -254,9 +275,9 @@ class Hell:
         self.daemons.append(daemon)
         logger.success(f'Loaded "{daemon.name}" daemon')
 
-    def init_daemon(self, target_name: str) -> bool:
+    def deploy_daemon(self, daemon: Daemon) -> bool:
         """Initialize a daemon"""
-        daemon = next(filter(lambda d: d.name == target_name, self.daemons))
+        daemon = next(filter(lambda d: d.name == daemon.name, self.daemons))
         success = daemon.deploy()
         if not success:
             return False
@@ -273,7 +294,11 @@ class Hell:
         errors = 0
 
         for daemon in self.daemons:
-            errors += not daemon.deploy()
+            error = not daemon.deploy()
+            if not error:
+                self.deployed_daemons.append(daemon)
+            errors += error
+
         errors = abs(errors)
 
         if not errors:
@@ -290,11 +315,11 @@ class Hell:
 
         return True
 
-    def kill_daemon(self, target_name: str) -> bool:
+    def kill_daemon(self, daemon: Daemon) -> bool:
         """Kill a daemon"""
-        daemon = next(filter(lambda d: d.name == target_name, self.running_daemons))
-        if daemon is None or daemon.pid == -1:
-            logger.warning(f"Daemon {target_name} is not running")
+        daemon = next(filter(lambda d: d.name == daemon.name, self.running_daemons))
+        if daemon is None or daemon.PID == -1:
+            logger.warning(f"Daemon {daemon.name} [PID {daemon.PID}] is not running")
             return False
 
         success = daemon.kill()
@@ -307,10 +332,24 @@ class Hell:
     def kill_all(self) -> None:
         """Kill all running daemons"""
         for daemon in self.running_daemons:
-            daemon.kill()
+            self.kill_daemon(daemon)
 
-        logger.info("System killed all daemons")
+        if len(self.running_daemons) == 0:
+            logger.info("System killed all daemons")
+        else:
+            logger.warning(
+                f"System failed to kill {len(self.running_daemons)} daemon(s):"
+            )
+            for daemon in self.running_daemons:
+                logger.error(
+                    f"| Daemon {daemon.name} [PID {daemon.PID}] failed to kill"
+                )
+
+                # if utils.send_signal(daemon.PID, signal.SIGTERM):
+                #     logger.success(f"| Daemon {daemon.name} [PID {daemon.PID}] killed by SIGTERM")
+                # else:
+                #     logger.error(f"| Daemon {daemon.name} [PID {daemon.PID}] failed to kill by SIGTERM")
 
 
 if __name__ == "__main__":
-    hell = Hell(autostart_enabled=True)
+    hell = Hell()

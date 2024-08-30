@@ -54,9 +54,10 @@ class Daemon:
         self.virtualenv_path = self.daemon_dir / constants.DEFAULT_VIRTUAL_ENV_NAME
 
         self._process: subprocess.Popen | None = None
+        self.failed_starts = 0
 
     @property
-    def pid(self) -> int:
+    def PID(self) -> int:
         """Return the pid of the daemon"""
         if self._process is None:
             return -1
@@ -130,14 +131,13 @@ class Daemon:
 
     def kill(self) -> bool:
         """Kill the daemon, and return True if successful"""
-        if self.pid == -1:
-            logger.error(f"Failed to kill {self.name} because it is not running")
+        if self.PID == -1:
+            logger.error(f"Daemon {self.name} is not running")
             return False
 
         self._process.terminate()
-        # if self._process.poll():
-        #     self._process.kill()
-        logger.success(f"Successfully killed {self.name} with PID {self.pid}")
+
+        logger.success(f"Successfully killed {self.name} with PID {self.PID}")
         return True
 
     @logger.catch
@@ -184,11 +184,8 @@ class Daemon:
 
         target = self.target_path.as_posix()
         for pid, path in utils.get_hell_pids():
-            logger.debug(
-                f"{pid}, {path}, {self.target_path}, {self.pid}, {path == self.target_path}, {pid == self.pid}"
-            )
-            if path == target and pid == self.pid:
-                logger.success(f"Successfully deployed {self.name} with PID {self.pid}")
+            if path == target and pid == self.PID:
+                logger.success(f"Successfully deployed {self.name} with PID {self.PID}")
                 self.deploy_time = time.time()
                 self.deployed_once = True
                 return True
@@ -199,7 +196,7 @@ class Daemon:
     def log_information(self):
         """Logs information about Daemon object like pid, name, target path, etc."""
 
-        logger.debug(f"Daemon: {self.name} [PID: {self.pid}]")
+        logger.debug(f"Daemon: {self.name} [PID: {self.PID}]")
         logger.debug(f"Target: {self.target_path}")
 
         requirements = "No requirements"

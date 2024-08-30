@@ -16,6 +16,7 @@ class LogLevel:
 # General settings
 ENCODING = "utf-8"
 WATCHER_SLEEP_TIME = timedelta(minutes=1)
+MAX_FAILED_STARTS = 3
 
 # Project paths
 PROJECT_PATH = Path(__file__).resolve().parent.parent
