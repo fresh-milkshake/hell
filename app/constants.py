@@ -14,7 +14,7 @@ class LogLevel:
 
 
 # General settings
-ENCODING = "utf-8"
+GLOBAL_ENCODING = "utf-8"
 WATCHER_SLEEP_TIME = timedelta(minutes=1)
 MAX_FAILED_STARTS = 3
 

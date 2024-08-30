@@ -157,7 +157,7 @@ class Hell:
             return {}
 
         with open(
-            constants.DAEMONS_CONFIG_PATH, "r", encoding=constants.ENCODING
+            constants.DAEMONS_CONFIG_PATH, "r", encoding=constants.GLOBAL_ENCODING
         ) as file:
             config = yaml.safe_load(file)  # yaml.load(file, Loader=yaml.FullLoader)
 

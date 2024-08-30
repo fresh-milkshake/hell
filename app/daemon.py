@@ -73,7 +73,7 @@ class Daemon:
             )
             return []
 
-        with open(self.requirements_path, "r", encoding=constants.ENCODING) as file:
+        with open(self.requirements_path, "r", encoding=constants.GLOBAL_ENCODING) as file:
             deps = file.read().splitlines()
 
             if not deps:
