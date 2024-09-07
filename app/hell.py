@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import threading
 import time
 from typing import List
 
@@ -9,6 +10,7 @@ import yaml
 
 from app import utils, constants
 from app.daemon import Daemon
+from app.web_interface import run_web_interface
 
 
 class Hell:
@@ -27,6 +29,8 @@ class Hell:
         if not self.run_daemons(config):
             logger.info("Shutting down...")
             return
+
+        threading.Thread(target=run_web_interface, args=(self,), daemon=True).start()
 
         self.enter_waiting_stage()
         self.log_daemons_data()

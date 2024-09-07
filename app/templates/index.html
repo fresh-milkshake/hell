@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Hell Dashboard</title>
+    </head>
+    <body>
+        <h1>Hell Dashboard</h1>
+        <ul id="daemon-list"></ul>
+
+        <script>
+            function updateDaemons() {
+                fetch("/api/daemons")
+                    .then((response) => response.json())
+                    .then((daemons) => {
+                        const list = document.getElementById("daemon-list");
+                        list.innerHTML = "";
+                        daemons.forEach((daemon) => {
+                            const li = document.createElement("li");
+                            li.textContent = `${daemon.name} (PID: ${daemon.pid}) - ${daemon.status}`;
+                            if (daemon.status === "Running") {
+                                const killButton =
+                                    document.createElement("button");
+                                killButton.textContent = "Kill";
+                                killButton.onclick = () =>
+                                    killDaemon(daemon.name);
+                                li.appendChild(killButton);
+                            }
+                            list.appendChild(li);
+                        });
+                    });
+            }
+
+            function killDaemon(name) {
+                fetch(`/api/kill/${name}`)
+                    .then((response) => response.json())
+                    .then((result) => {
+                        if (result.success) {
+                            updateDaemons();
+                        } else {
+                            alert("Failed to kill daemon");
+                        }
+                    });
+            }
+
+            updateDaemons();
+            setInterval(updateDaemons, 5000);
+        </script>
+    </body>
+</html>
