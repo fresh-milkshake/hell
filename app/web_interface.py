@@ -1,5 +1,4 @@
 from flask import Flask, render_template, jsonify
-from app.hell import Hell
 
 app = Flask(__name__)
 hell_instance = None
@@ -30,7 +29,7 @@ def kill_daemon(daemon_name):
     return jsonify({"success": success})
 
 
-def run_web_interface(hell: Hell):
+def run_web_interface(hell):
     global hell_instance
     hell_instance = hell
     app.run(debug=True)
