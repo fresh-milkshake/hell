@@ -10,7 +10,7 @@ import yaml
 
 from app import utils, constants
 from app.daemon import Daemon
-from app.web_interface import run_web_interface
+from app.web_interface import start_web_interface, stop_web_interface
 
 
 class Hell:
@@ -30,11 +30,13 @@ class Hell:
             logger.info("Shutting down...")
             return
 
-        threading.Thread(target=run_web_interface, args=(self,), daemon=True).start()
+        start_web_interface(self)
 
         self.enter_waiting_stage()
         self.log_daemons_data()
         self.kill_all()
+        
+        stop_web_interface()
 
     @property
     def running_daemons(self) -> List[Daemon]:
