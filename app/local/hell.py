@@ -1,25 +1,35 @@
 import os
 from pathlib import Path
+import signal
 import time
-from typing import List
+from typing import List, Tuple
 
 from loguru import logger
 
+import psutil
 import yaml
 
-from app import utils, constants
-from app.daemon import Daemon
+from app.local.enums import DaemonStatus
+from app.local import utils, constants
+from app.local.daemon import Daemon
 
 
+@utils.singleton
 class Hell:
     """Class "Manager" for daemons deployment and killing"""
 
     def __init__(self) -> None:
         self.daemons: List[Daemon] = []
-        self.deployed_daemons: List[Daemon] = []
         self.auto_restart_list: List[Daemon] = []
         self.pending_for_restart: List[Daemon] = []
+        self.running_daemons: List[Daemon] = []
+        self._running = False
+        
+    def stop(self):
+        self._running = False
 
+    def start(self):
+        self._running = True
         self.start_time = time.time()
 
         config = self.load_config()
@@ -28,94 +38,86 @@ class Hell:
             logger.info("Shutting down...")
             return
 
-        self.enter_waiting_stage()
+        self.wait_and_watch()
         self.log_daemons_data()
         self.kill_all()
 
-    @property
-    def running_daemons(self) -> List[Daemon]:
+    def get_running_daemons(self) -> List[Daemon]:
         """Return a list of currently running daemons"""
-        return [d for d in self.daemons if d.PID != -1]
+        return [d for d in self.daemons if d.status == DaemonStatus.RUNNING]
 
-    @property
-    def stale_daemons(self) -> List[Daemon]:
+    def get_stopped_daemons(self) -> List[Daemon]:
         """Return a list of daemons that are not running already"""
-        return [d for d in self.daemons if d.PID == -1]
+        return [d for d in self.daemons if d.status == DaemonStatus.STOPPED]
 
-    @property
-    def daemons_count(self) -> int:
-        return len(self.daemons)
+    def wait_and_watch(self):
+        """Watch for currently running daemons and check their state"""
 
-    def enter_waiting_stage(self):
-        try:
-            if len(self.daemons) == 0:
-                logger.info("No daemons loaded")
-                return
-            self.watch()
-        except KeyboardInterrupt:
-            logger.info("System stopped manually [CTRL+C]")
-        except Exception as err:
-            logger.exception(err)
+        if not self.daemons:
+            logger.info("No daemons loaded")
+            return
+
+        while self._running:
+            try:
+                self.check_daemons_state()
+            except KeyboardInterrupt:
+                logger.info("System paused manually [CTRL+C]")
+                if input(">>> Are you sure you want to exit? [y/N]") == "y":
+                    break
+            except Exception as err:
+                logger.exception(err)
 
         working_time = time.time() - self.start_time
         logger.info(
             f"Ending session...Working time: {time.strftime('%H:%M:%S', time.gmtime(working_time))}"
         )
 
-    def deploy_daemon(self, daemon: Daemon) -> bool:
-        success = daemon.deploy()
+    def check_daemons_state(self):
+        """Check the state of currently running daemons"""
+        pending_for_restart = []
+        for daemon in self.daemons:
+            if not daemon.is_running():
+                logger.warning(f"Daemon {daemon.name} no longer running...")
+                if daemon.restart_if_stopped:
+                    daemon.status = DaemonStatus.PENDING
+                    pending_for_restart.append(daemon)
 
-        if success:
-            daemon.failed_starts = 0
-            logger.success(f"'{daemon.name}' started [PID {daemon.PID}]")
-            self.deployed_daemons.append(daemon)
-        else:
-            daemon.failed_starts += 1
-            logger.warning(f"Can't start '{daemon.name}'")
-
-        return success
-
-    def restart_stale_daemons(self):
-        for daemon in self.stale_daemons:
-            if (
-                daemon.auto_restart
-                and daemon.failed_starts < constants.MAX_FAILED_STARTS
-            ):
+        for daemon in pending_for_restart:
+            if daemon.failed_starts < constants.MAX_FAILED_STARTS:
                 logger.info(f"Restarting daemon '{daemon.name}'...")
                 self.deploy_daemon(daemon)
 
-    def watch(self):
-        """Watch for currently running daemons and check their state"""
-        while 1:
-            self.restart_stale_daemons()
+        if not self.get_running_daemons():
+            logger.warning("No daemons running...")
+            return
 
-            deployed_daemons = []
-            available_daemons = utils.get_hell_pids(only_pids=True)
-            for deployed_daemon in self.deployed_daemons:
-                if deployed_daemon.PID in available_daemons:
-                    deployed_daemons.append(deployed_daemon)
-                    logger.info(
-                        f"Daemon {deployed_daemon.name} still running with PID {deployed_daemon.PID}..."
-                    )
-                else:
-                    deployed_daemon.PID = -1
-                    logger.warning(
-                        f"Daemon {deployed_daemon.name} (last PID {deployed_daemon.PID}) is no longer running..."
-                    )
+        time.sleep(constants.WATCHER_SLEEP_TIME.total_seconds())
 
-            self.deployed_daemons = deployed_daemons
-            if len(deployed_daemons) > 0:
-                for daemon in self.stale_daemons:
-                    if daemon not in self.deployed_daemons:
-                        logger.debug(f"Daemon {daemon.name} still not running...")
-                    else:
-                        logger.warning(f"Daemon {daemon.name} no longer running...")
+    def find_daemons_processes(
+        self, path_prefix: str = str(constants.DAEMONS_PATH), only_pids: bool = True
+    ) -> List[int] | List[Tuple[int, str]]:
+        pids = []
+        for proc in psutil.process_iter(attrs=["pid", "name", "cmdline"]):
+            try:
+                pinfo = proc.info
+                if (
+                    pinfo["name"] == constants.CMD_PYTHON
+                    and len(pinfo["cmdline"]) > 1
+                    and pinfo["cmdline"][1].startswith(path_prefix)
+                ):
+                    pid = pinfo["pid"]
+                    file_path = pinfo["cmdline"][1]
+                    pids.append(pid if only_pids else (pid, file_path))
+            except psutil.NoSuchProcess:
+                continue
+            except psutil.AccessDenied:
+                logger.warning(f"Access denied for process {pinfo['pid']}")
+            except Exception as e:
+                logger.error(
+                    f"Unexpected error processing PID {pinfo['pid']}: {str(e)}"
+                )
 
-            if len(self.running_daemons) == 0:
-                logger.warning("No daemons running...")
-                return
-
-            time.sleep(constants.WATCHER_SLEEP_TIME.total_seconds())
+        return pids
 
     def log_daemons_data(self) -> None:
         """Log a list of daemons"""
@@ -154,7 +156,7 @@ class Hell:
         """Load the config file"""
         if not os.path.exists(constants.DAEMONS_CONFIG_PATH):
             logger.critical(f"Config file not found at {constants.DAEMONS_CONFIG_PATH}")
-            return {}
+            exit(1)
 
         with open(
             constants.DAEMONS_CONFIG_PATH, "r", encoding=constants.GLOBAL_ENCODING
@@ -167,7 +169,7 @@ class Hell:
 
         return config
 
-    def create_daemon(self, name: str, config: dict) -> Daemon:
+    def create_daemon(self, name: str, config: dict) -> Daemon | None:
         """Create a daemon from a given config dict.
 
         Parameters for a daemon in YAML format:
@@ -229,19 +231,19 @@ class Hell:
         use_venv = config.get("use-venv", constants.DEFAULT_USE_VIRTUAL_ENV)
 
         daemon = Daemon(
-            name,
-            target,
-            daemon_directory,
-            requirements_needed,
-            requirements,
-            arguments,
-            auto_restart,
-            use_venv,
+            name=name,
+            project_folder=daemon_directory,
+            main_file=target,
+            main_file_arguments=arguments,
+            requirements_needed=requirements_needed,
+            requirements_path=requirements,  # type: ignore
+            restart_if_stopped=auto_restart,
+            use_virtualenv=use_venv,
         )
 
         return daemon
 
-    def run_daemons(self, config: dict) -> None:
+    def run_daemons(self, config: dict) -> bool:
         """Load daemons from a given path"""
 
         if not config["daemons"]:
@@ -251,10 +253,10 @@ class Hell:
         for daemon_name in config["daemons"]:
             daemon_config = config["daemons"][daemon_name]
             daemon = self.create_daemon(daemon_name, daemon_config)
-            if not daemon is None:
+            if daemon is not None:
                 self.add_daemon(daemon)
-                if daemon.auto_restart:
-                    self.auto_restart_list.append(daemon.name)
+                if daemon.restart_if_stopped:
+                    self.auto_restart_list.append(daemon)
 
         count = len(self.daemons)
 
@@ -268,7 +270,7 @@ class Hell:
 
     def add_daemon(self, daemon: Daemon) -> None:
         """Add a daemon to the list of daemons"""
-        if daemon.target_path in [d.target_path for d in self.daemons]:
+        if daemon.main_file in [d.main_file for d in self.daemons]:
             logger.error(f"Daemon {daemon.name} already exists")
             return
 
@@ -277,47 +279,69 @@ class Hell:
 
     def deploy_daemon(self, daemon: Daemon) -> bool:
         """Initialize a daemon"""
-        daemon = next(filter(lambda d: d.name == daemon.name, self.daemons))
         success = daemon.deploy()
         if not success:
             return False
 
-        self.deployed_daemons.append(daemon)
+        self.running_daemons.append(daemon)
         return True
 
-    def deploy_all(self) -> None:
+    def deploy_all(self) -> bool:
         """Deploy all daemons"""
         if not self.daemons:
             logger.critical("No daemons loaded for deploing")
-            return
+            return False
 
         errors = 0
 
         for daemon in self.daemons:
             error = not daemon.deploy()
             if not error:
-                self.deployed_daemons.append(daemon)
+                self.running_daemons.append(daemon)
             errors += error
 
         errors = abs(errors)
 
         if not errors:
             logger.success(
-                f"System initialized and deployed all daemons ({self.daemons_count})"
+                f"System initialized and deployed all daemons ({len(self.daemons)})"
             )
         else:
             logger.info(
-                f"System encountered {errors} failure(s) and deployed {self.daemons_count - errors} daemon(s)"
+                f"System encountered {errors} failure(s) and deployed {len(self.daemons) - errors} daemon(s)"
             )
 
-        if errors == self.daemons_count:
+        if errors == len(self.daemons):
             return False
 
         return True
 
+    def search_daemon_by_pid(self, pid: int) -> Daemon | None:
+        """Search a daemon by pid"""
+        for daemon in self.daemons:
+            if daemon.PID == pid:
+                return daemon
+        return None
+
+    def search_daemon_by_file(self, file: Path) -> Daemon | None:
+        """Search a daemon by file"""
+        for daemon in self.daemons:
+            if daemon.main_file == file:
+                return daemon
+        return None
+
+    def search_daemon_by_name(self, name: str) -> Daemon | None:
+        """Search a daemon by name"""
+        for daemon in self.daemons:
+            if daemon.name == name:
+                return daemon
+        return None
+
     def kill_daemon(self, daemon: Daemon) -> bool:
         """Kill a daemon"""
-        daemon = next(filter(lambda d: d.name == daemon.name, self.running_daemons))
+        daemon = next(
+            filter(lambda d: d.name == daemon.name, self.get_running_daemons())
+        )
         if daemon is None or daemon.PID == -1:
             logger.warning(f"Daemon {daemon.name} [PID {daemon.PID}] is not running")
             return False
@@ -326,29 +350,33 @@ class Hell:
         if not success:
             return False
 
-        self.deployed_daemons.remove(daemon)
+        self.running_daemons.remove(daemon)
         return True
 
     def kill_all(self) -> None:
         """Kill all running daemons"""
-        for daemon in self.running_daemons:
+        for daemon in self.get_running_daemons():
             self.kill_daemon(daemon)
 
-        if len(self.running_daemons) == 0:
+        if not self.get_running_daemons():
             logger.info("System killed all daemons")
         else:
             logger.warning(
-                f"System failed to kill {len(self.running_daemons)} daemon(s):"
+                f"System failed to kill {len(self.get_running_daemons())} daemon(s):"
             )
-            for daemon in self.running_daemons:
+            for daemon in self.get_running_daemons():
                 logger.error(
                     f"| Daemon {daemon.name} [PID {daemon.PID}] failed to kill"
                 )
 
-                # if utils.send_signal(daemon.PID, signal.SIGTERM):
-                #     logger.success(f"| Daemon {daemon.name} [PID {daemon.PID}] killed by SIGTERM")
-                # else:
-                #     logger.error(f"| Daemon {daemon.name} [PID {daemon.PID}] failed to kill by SIGTERM")
+                if utils.send_signal(daemon.PID, signal.SIGTERM):
+                    logger.success(
+                        f"| Daemon {daemon.name} [PID {daemon.PID}] killed by SIGTERM"
+                    )
+                else:
+                    logger.error(
+                        f"| Daemon {daemon.name} [PID {daemon.PID}] failed to kill by SIGTERM"
+                    )
 
 
 if __name__ == "__main__":
