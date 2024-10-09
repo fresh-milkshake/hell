@@ -172,4 +172,3 @@ venv.bak/
 daemons/
 OLD/
 *.log
-*.zip
