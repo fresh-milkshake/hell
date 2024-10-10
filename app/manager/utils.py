@@ -63,7 +63,7 @@ def get_hell_pids(
     return pids
 
 
-def send_signal(pid: int, signal: int) -> bool:
+def kill_by_signal(pid: int, signal: int) -> bool:
     """Send a signal to a process."""
     try:
         os.kill(pid, signal)

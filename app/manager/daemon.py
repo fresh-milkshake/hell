@@ -39,6 +39,7 @@ class Daemon:
                     f"requirements_path is not a valid path: {requirements_path}"
                 )
 
+        self.__successful_restarts = 0
         self.name = name
         self.project_folder = project_folder
         self.requirements_path = requirements_path
@@ -175,20 +176,20 @@ class Daemon:
         logger.success(f"Installed dependencies: {', '.join(dependencies)}")
         return True
 
-    def kill(self) -> bool:
+    async def stop(self) -> bool:
         """Kill the daemon, and return True if successful"""
         if self._process is None or self.status == DaemonStatus.STOPPED:
             logger.error(f"Daemon {self.name} is not running")
             return False
 
         self._process.terminate()
-        if self._process.poll() is None:
-            logger.success(f"Successfully killed {self.name} with PID {self.PID}")
+        if not self.is_running():
+            logger.success(f"Successfully terminated {self.name} with PID {self.PID}")
             return True
 
         self._process.kill()
-        if self._process.poll() is None:
-            logger.error(f"Successfully killed {self.name} with PID {self.PID}")
+        if not self.is_running():
+            logger.success(f"Successfully killed {self.name} with PID {self.PID}")
             return True
 
         logger.error(f"Failed to kill {self.name} with PID {self.PID}")
@@ -199,7 +200,7 @@ class Daemon:
         return self._process.poll() is None if self._process else False
 
     @logger.catch
-    def deploy(self) -> bool:
+    async def start(self) -> bool:
         """Deploy the daemon, and return True if successful"""
         logger.info(f"Deploying {self.name}...")
 
@@ -246,7 +247,11 @@ class Daemon:
 
         logger.success(f"Successfully deployed {self.name} with PID {self.PID}")
         self.deployed_at = time.time()
-        self.deployed_once = True
+        if self.__successful_restarts > 1:
+            self.deployed_once = False
+        else:
+            self.deployed_once = True
+        self.__successful_restarts += 1
         return True
 
     def log_information(self):

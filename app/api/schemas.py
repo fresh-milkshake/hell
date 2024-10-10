@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from app.manager.enums import DaemonStatus
 
 
-class Daemon(BaseModel):
+class DaemonData(BaseModel):
     name: str
     main_file: str
     directory: str
@@ -18,17 +18,13 @@ class Daemon(BaseModel):
     deployed_at: float
     virtualenv_path: str
     pid: int
+    status: DaemonStatus
 
 
 class DaemonList(BaseModel):
-    daemons: List[Daemon]
+    daemons: List[DaemonData]
     count: int
     timestamp: float
-
-
-class DaemonResponse(BaseModel):
-    status: DaemonStatus
-    name: str
 
 
 class ErrorResponse(BaseModel):

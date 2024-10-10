@@ -25,7 +25,7 @@ class Invitation(BaseModel):
 class APIKey(BaseModel):
     id = pw.IntegerField(primary_key=True)
     created_at = pw.DateTimeField(default=datetime.now)
-    invitation_id = pw.ForeignKeyField(Invitation, backref='token', unique=True)
+    invitation = pw.ForeignKeyField(Invitation, backref='token', unique=True)
     token = pw.CharField(max_length=32, unique=True)
     active = pw.BooleanField(default=True)
     last_used = pw.DateTimeField(null=True)

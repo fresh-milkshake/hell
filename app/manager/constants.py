@@ -45,10 +45,9 @@ IGNORE_REQUIREMENTS_SETTING = "-"
 
 # Logging settings
 LOG_LEVEL = LogLevel.DEBUG
+# "<cyan>{file: <15}</cyan>:<cyan>{line: <5}</cyan> | <cyan>{function: <25}</cyan> | "
 LOG_FORMAT_STRING = (
-    "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | "
-    "<cyan>{file: <15}</cyan>:<cyan>{line: <5}</cyan> | <cyan>{function: <20}</cyan> | "
-    "<level>{message}</level>"
+    "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <level>{message}</level>"
 )
 LOG_FILE_NAME = "manager.log"
 LOG_FILE_PATH = PROJECT_PATH / LOG_FILE_NAME

@@ -5,6 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
 
+from app.api import limiter
 from app.api.constants import ONLY_FOR_INTERNAL_USAGE
 from app.api.models import Invitation, APIKey
 
@@ -28,6 +29,7 @@ def is_local_network(request: Request):
 
 
 @router.post("/create/invitation")
+@limiter.limit("5/minute")
 def create_invitation(request: Request):
     if not is_local_network(request):
         raise HTTPException(
@@ -43,7 +45,8 @@ def create_invitation(request: Request):
 
 
 @router.post("/create/token")
-def generate_api_key(invitation_code: str):
+@limiter.limit("5/minute")
+def generate_api_key(request: Request, invitation_code: str):
     inv: Optional[Invitation] = (
         Invitation.select().where(Invitation.code == invitation_code).first()
     )

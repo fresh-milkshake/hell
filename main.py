@@ -1,8 +1,8 @@
 import sys
 
 from loguru import logger
+
 from app.manager import constants
-from app.api import app
 
 logger.remove()
 logger.add(
@@ -20,4 +20,4 @@ logger.add(
     retention="10 days",
 )
 
-logger.info("Starting Hell Gate")
+from app.api import app
