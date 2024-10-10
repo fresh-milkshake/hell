@@ -1,15 +1,14 @@
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Request
-
 import ipaddress
-from fastapi.security import APIKeyHeader
 import secrets
 import sqlite3
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.security import APIKeyHeader
 
 from app.api import dependencies, schemas
-from app.local.daemon import Daemon, DaemonStatus
-from app.local.hell import Hell
-
+from app.manager.daemon import Daemon, DaemonStatus
+from app.manager.hell import Hell
 
 router = APIRouter()
 
@@ -79,7 +78,7 @@ def create_invitation(request: Request):
     if not is_local_network(request):
         raise HTTPException(
             status_code=403,
-            detail="Access denied: This endpoint is accessible only from the local network.",
+            detail="Access denied: This endpoint is accessible only from the manager network.",
         )
 
     invitation_code = generate_token()
@@ -129,8 +128,8 @@ def generate_api_key(invitation_code: str):
 #     return {"message": "Access granted with a valid API key!"}
 @router.get("/daemons/", response_model=schemas.DaemonList)
 async def list_daemons(
-    hell: Hell = Depends(dependencies.get_hell_instance),
-    api_key: str = Depends(verify_api_key),
+        hell: Hell = Depends(dependencies.get_hell_instance),
+        api_key: str = Depends(verify_api_key),
 ):
     """List all daemons and their statuses"""
     return schemas.DaemonList(
@@ -162,8 +161,8 @@ async def list_daemons(
 
 @router.post("/daemons/{daemon_name}/start", response_model=schemas.DaemonResponse)
 async def start_daemon(
-    daemon: Daemon = Depends(dependencies.get_daemon),
-    api_key: str = Depends(verify_api_key),
+        daemon: Daemon = Depends(dependencies.get_daemon),
+        api_key: str = Depends(verify_api_key),
 ):
     """Start a specific daemon"""
     if daemon.deploy():
@@ -174,8 +173,8 @@ async def start_daemon(
 
 @router.post("/daemons/{daemon_name}/stop", response_model=schemas.DaemonResponse)
 async def stop_daemon(
-    daemon: Daemon = Depends(dependencies.get_daemon),
-    api_key: str = Depends(verify_api_key),
+        daemon: Daemon = Depends(dependencies.get_daemon),
+        api_key: str = Depends(verify_api_key),
 ):
     """Stop a specific daemon"""
     if daemon.kill():
