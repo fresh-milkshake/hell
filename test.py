@@ -8,7 +8,7 @@ def print_response(prefix, response):
     try:
         print(f"{prefix}: {response.json()}")
     except requests.exceptions.JSONDecodeError:
-        print(f"{prefix}: {response.text}")
+        print(f"{prefix}: {response.code}")
 
 
 def test_create_invitation():

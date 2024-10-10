@@ -1,6 +1,8 @@
-from pydantic import BaseModel
 from typing import List
-from app.local.enums import DaemonStatus
+
+from pydantic import BaseModel
+
+from app.manager.enums import DaemonStatus
 
 
 class Daemon(BaseModel):
@@ -11,7 +13,7 @@ class Daemon(BaseModel):
     auto_restart: bool
     arguments: str
     use_virtualenv: bool
-    dependancies_installed: bool
+    dependencies_installed: bool
     deployed_once: bool
     deployed_at: float
     virtualenv_path: str

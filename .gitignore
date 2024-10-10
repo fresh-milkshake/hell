@@ -173,3 +173,5 @@ daemons/
 OLD/
 *.log
 *.zip
+*.db
+.gitignore

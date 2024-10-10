@@ -1,20 +1,37 @@
+from datetime import datetime
 from pathlib import Path
-from fastapi import Depends, HTTPException
-from app.local.hell import Hell
 from typing import Optional, Tuple
-from app.local.daemon import Daemon
+
+from fastapi import Depends, HTTPException
+from fastapi.security import APIKeyHeader
+
+from app.api.constants import API_KEY_HEADER_NAME
+from app.api.models import APIKey
+from app.manager.daemon import Daemon
+from app.manager.hell import Hell
+
+api_key_header = APIKeyHeader(name=API_KEY_HEADER_NAME, auto_error=False)
 
 
 def get_hell_instance() -> Hell:
     return Hell()
 
 
+def verify_api_key(api_key: str = Depends(api_key_header)):
+    key: Optional[APIKey] = APIKey.select().where(APIKey.token == api_key).first()
+    key.last_used = datetime.now()
+    key.save()
+    if not key:
+        raise HTTPException(status_code=403, detail="Invalid API key")
+    return api_key
+
+
 def get_daemon(
-    hell: Hell = Depends(get_hell_instance),
-    daemon_name: Optional[str] = None,
-    daemon_pid: Optional[int] = None,
-    daemon_file: Optional[Path] = None,
-) -> Optional[Daemon]:
+        hell: Hell = Depends(get_hell_instance),
+        daemon_name: Optional[str] = None,
+        daemon_pid: Optional[int] = None,
+        daemon_file: Optional[Path] = None,
+) -> Daemon:
     search_methods = [
         (daemon_name, hell.search_daemon_by_name),
         (daemon_pid, hell.search_daemon_by_pid),
@@ -24,15 +41,7 @@ def get_daemon(
     for search_param, search_method in search_methods:
         if search_param:
             daemon = search_method(search_param)
-            if daemon is None:
-                raise HTTPException(status_code=404, detail="Daemon not found")
-            return daemon
-    return None
+            if daemon:
+                return daemon
 
-
-def get_hell_and_daemon(
-    daemon_name: Optional[str] = None,
-) -> Tuple[Hell, Optional[Daemon]]:
-    hell = get_hell_instance()
-    daemon = get_daemon(hell, daemon_name)
-    return hell, daemon
+    raise HTTPException(status_code=404, detail="Daemon not found")

@@ -1,17 +1,19 @@
 """Utility functions for the 'Hell' project."""
 
 import os
-from pathlib import Path
 import platform
+from pathlib import Path
 from typing import List, Tuple, Union
-from loguru import logger
+
 import psutil
-from app.local import constants
+from loguru import logger
+
+from app.manager import constants
 
 
 def get_hell_pids(
-    path_prefix: Path = constants.DAEMONS_PATH,  # type: ignore
-    only_pids: bool = False,
+        path_prefix: Path = constants.DAEMONS_PATH,  # type: ignore
+        only_pids: bool = False,
 ) -> Union[List[int], List[Tuple[int, str]]]:
     """
     Return a list of 'Hell' process IDs and optionally their associated file paths.
@@ -34,7 +36,7 @@ def get_hell_pids(
     path_prefix: str = str(Path(path_prefix).resolve())  # type: ignore
 
     for proc in psutil.process_iter(attrs=["pid", "name", "cmdline"]):
-        # {'pid': 27796, 'name': 'python.exe', 'cmdline': ['C:\\Users\\dev\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', 'd:/code/projects/hell/test.py']}
+        # {'pid': 27796, 'name': 'python.exe', 'cmdline': ['C:\\Users\\dev\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', 'd:/code/projects/manager/test.py']}
         try:
             pinfo = proc.info
             cmdline = pinfo.get("cmdline") or []

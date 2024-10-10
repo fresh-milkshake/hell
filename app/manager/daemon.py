@@ -1,15 +1,14 @@
-import os
 import platform
-from pathlib import Path
 import subprocess
 import time
-from typing import List, Optional, Tuple
+from pathlib import Path
+from typing import List, Optional
 
 from loguru import logger
 
-from app.local import utils, constants
-from app.local.enums import DaemonStatus
-from app.local.executor import Cmd
+from app.manager import constants
+from app.manager.enums import DaemonStatus
+from app.manager.executor import Cmd
 
 
 class Daemon:
@@ -18,15 +17,15 @@ class Daemon:
     requirements_command = f"{constants.CMD_PIP} install -r "
 
     def __init__(
-        self,
-        name: str,
-        project_folder: Path,
-        main_file: Path,
-        main_file_arguments: str = "",
-        requirements_needed: bool = False,
-        requirements_path: Optional[Path] = None,
-        restart_if_stopped: bool = False,
-        use_virtualenv: bool = True,
+            self,
+            name: str,
+            project_folder: Path,
+            main_file: Path,
+            main_file_arguments: str = "",
+            requirements_needed: bool = False,
+            requirements_path: Optional[Path] = None,
+            restart_if_stopped: bool = False,
+            use_virtualenv: bool = True,
     ) -> None:
         if not isinstance(project_folder, Path):
             logger.error(f"project_folder is not a valid path: {project_folder}")
@@ -130,7 +129,7 @@ class Daemon:
             return []
 
         with open(
-            self.requirements_path, "r", encoding=constants.GLOBAL_ENCODING
+                self.requirements_path, "r", encoding=constants.GLOBAL_ENCODING
         ) as file:
             deps = file.read().splitlines()
 
@@ -205,8 +204,8 @@ class Daemon:
         logger.info(f"Deploying {self.name}...")
 
         if (
-            self.requirements_path != constants.IGNORE_REQUIREMENTS_SETTING
-            and not self.dependencies_installed
+                self.requirements_path != constants.IGNORE_REQUIREMENTS_SETTING
+                and not self.dependencies_installed
         ):
             self.dependencies_installed = self.install_dependancies()
             if not self.dependencies_installed:

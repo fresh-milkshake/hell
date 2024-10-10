@@ -1,10 +1,12 @@
+import platform
 import shutil
 import subprocess
-from loguru import logger
-import platform
 from subprocess import Popen, PIPE, TimeoutExpired
 from typing import Optional, Tuple, Union
-from app.local.utils import singleton
+
+from loguru import logger
+
+from app.manager.utils import singleton
 
 
 class Cmd:
@@ -67,7 +69,7 @@ class Cmd:
         return True
 
     def execute_blocking(
-        self, show_output: bool = False, timeout: int = 0
+            self, show_output: bool = False, timeout: int = 0
     ) -> Tuple[int, str]:
         """
         Execute the command represented by this Cmd instance.
@@ -107,11 +109,11 @@ class Executor:
         self.history = []
 
     def execute(
-        self,
-        cmd: Cmd,
-        show_output: bool = False,
-        timeout: Optional[float] = None,
-        blocking: bool = True,
+            self,
+            cmd: Cmd,
+            show_output: bool = False,
+            timeout: Optional[float] = None,
+            blocking: bool = True,
     ) -> Tuple[int, str] | Popen:
         """
         Execute a Cmd object and return the exit code and output.
@@ -120,25 +122,26 @@ class Executor:
             cmd (Cmd): The command to execute.
             show_output (bool): Whether to print the output in real-time.
             timeout (int): Maximum time in seconds for the command to complete.
+            blocking (bool): Whether to run with blocking current thread or not.
 
         Returns:
             Tuple[int, str]: A tuple containing the exit code and the full output.
         """
-        command_sequence = str(cmd)
-        self.history.append(command_sequence)
+        string_cmd = str(cmd)
+        self.history.append(string_cmd)
 
         if blocking:
             return self._execute_command(
-                command_sequence, show_output=show_output, timeout=timeout
+                string_cmd, show_output=show_output, timeout=timeout
             )
         else:
-            return self._return_process(command_sequence)
+            return self._return_process(cmd)
 
+    @staticmethod
     def _execute_command(
-        self,
-        command_sequence: str,
-        show_output: bool = False,
-        timeout: Optional[float] = None,
+            command_sequence: str,
+            show_output: bool = False,
+            timeout: Optional[float] = None,
     ) -> Tuple[int, str]:
         logger.debug(f"Running command: {command_sequence}")
 
@@ -183,14 +186,13 @@ class Executor:
 
         return code, full_output
 
+    @staticmethod
     def _return_process(
-        self,
-        command_sequence: str,
+            command_sequence: Cmd,
     ) -> Popen:
-        CMD = command_sequence.split(" ")
         try:
             process = Popen(
-                CMD,
+                command_sequence.subcommands,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,
@@ -201,7 +203,3 @@ class Executor:
         except Exception as e:
             logger.exception(e)
             raise
-
-    def get_history(self) -> Tuple[str, ...]:
-        """Return the history of executed commands."""
-        return tuple(self.history)

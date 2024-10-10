@@ -1,7 +1,7 @@
 """Global constants for the project."""
 
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
 
 from loguru import logger
 
@@ -29,7 +29,6 @@ if WATCHER_SLEEP_TIME < timedelta(minutes=1):
         f"Watcher sleep time is less than 1 minute. This potentially may cause a large log file size (>= {mb_per_hour:.2f} MB per hour)."
     )
 
-
 # Project paths
 PROJECT_PATH = Path(__file__).resolve().parent.parent.parent
 DAEMONS_CONFIG_PATH = PROJECT_PATH / "daemons.yaml"
@@ -51,7 +50,7 @@ LOG_FORMAT_STRING = (
     "<cyan>{file: <15}</cyan>:<cyan>{line: <5}</cyan> | <cyan>{function: <20}</cyan> | "
     "<level>{message}</level>"
 )
-LOG_FILE_NAME = "hell.log"
+LOG_FILE_NAME = "manager.log"
 LOG_FILE_PATH = PROJECT_PATH / LOG_FILE_NAME
 
 # Command settings

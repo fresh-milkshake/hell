@@ -1,17 +1,16 @@
 import os
-from pathlib import Path
 import signal
 import time
+from pathlib import Path
 from typing import List, Tuple
-
-from loguru import logger
 
 import psutil
 import yaml
+from loguru import logger
 
-from app.local.enums import DaemonStatus
-from app.local import utils, constants
-from app.local.daemon import Daemon
+from app.manager import utils, constants
+from app.manager.daemon import Daemon
+from app.manager.enums import DaemonStatus
 
 
 @utils.singleton
@@ -24,7 +23,8 @@ class Hell:
         self.pending_for_restart: List[Daemon] = []
         self.running_daemons: List[Daemon] = []
         self._running = False
-        
+        self.start_time = None
+
     def stop(self):
         self._running = False
 
@@ -93,17 +93,23 @@ class Hell:
 
         time.sleep(constants.WATCHER_SLEEP_TIME.total_seconds())
 
-    def find_daemons_processes(
-        self, path_prefix: str = str(constants.DAEMONS_PATH), only_pids: bool = True
-    ) -> List[int] | List[Tuple[int, str]]:
+    def log_daemons_data(self) -> None:
+        """Log a list of daemons"""
+        for daemon in self.daemons:
+            daemon.log_information()
+
+    @staticmethod
+    def find_daemons_processes(path_prefix: str = str(constants.DAEMONS_PATH), only_pids: bool = True) -> List[int] | \
+                                                                                                          List[Tuple[
+                                                                                                              int, str]]:
         pids = []
         for proc in psutil.process_iter(attrs=["pid", "name", "cmdline"]):
+            pinfo = proc.info
             try:
-                pinfo = proc.info
                 if (
-                    pinfo["name"] == constants.CMD_PYTHON
-                    and len(pinfo["cmdline"]) > 1
-                    and pinfo["cmdline"][1].startswith(path_prefix)
+                        pinfo["name"] == constants.CMD_PYTHON
+                        and len(pinfo["cmdline"]) > 1
+                        and pinfo["cmdline"][1].startswith(path_prefix)
                 ):
                     pid = pinfo["pid"]
                     file_path = pinfo["cmdline"][1]
@@ -119,12 +125,8 @@ class Hell:
 
         return pids
 
-    def log_daemons_data(self) -> None:
-        """Log a list of daemons"""
-        for daemon in self.daemons:
-            daemon.log_information()
-
-    def update_constants(self, config: dict) -> None:
+    @staticmethod
+    def update_constants(config: dict) -> None:
         """Updates global constants like DAEMONS_PATH and other based on config dict.
 
         Parameters for a global setting are:
@@ -152,14 +154,15 @@ class Hell:
             "default-auto-restart", constants.DEFAULT_AUTO_RESTART
         )
 
-    def load_config(self) -> dict:
+    @staticmethod
+    def load_config() -> dict:
         """Load the config file"""
         if not os.path.exists(constants.DAEMONS_CONFIG_PATH):
             logger.critical(f"Config file not found at {constants.DAEMONS_CONFIG_PATH}")
             exit(1)
 
         with open(
-            constants.DAEMONS_CONFIG_PATH, "r", encoding=constants.GLOBAL_ENCODING
+                constants.DAEMONS_CONFIG_PATH, "r", encoding=constants.GLOBAL_ENCODING
         ) as file:
             config = yaml.safe_load(file)  # yaml.load(file, Loader=yaml.FullLoader)
 
@@ -169,7 +172,8 @@ class Hell:
 
         return config
 
-    def create_daemon(self, name: str, config: dict) -> Daemon | None:
+    @staticmethod
+    def create_daemon(name: str, config: dict) -> Daemon | None:
         """Create a daemon from a given config dict.
 
         Parameters for a daemon in YAML format:
@@ -194,7 +198,7 @@ class Hell:
             virtualenv: <True/False/true/false>
         """
 
-        daemon_directory = config.get("dir", name)
+        daemon_directory = config.get("dir", Path(name))
         daemon_directory: Path = constants.DAEMONS_PATH / daemon_directory
         if not daemon_directory.exists():
             logger.warning(f'Daemon directory "{daemon_directory}" not found')
@@ -213,9 +217,9 @@ class Hell:
         if requirements != constants.IGNORE_REQUIREMENTS_SETTING:
             if requirements == "default":
                 requirements = (
-                    constants.DAEMONS_PATH
-                    / daemon_directory
-                    / constants.DEFAULT_REQUIREMENTS_PATH
+                        constants.DAEMONS_PATH
+                        / daemon_directory
+                        / constants.DEFAULT_REQUIREMENTS_PATH
                 )
             else:
                 requirements = constants.DAEMONS_PATH / daemon_directory / requirements
@@ -342,7 +346,7 @@ class Hell:
         daemon = next(
             filter(lambda d: d.name == daemon.name, self.get_running_daemons())
         )
-        if daemon is None or daemon.PID == -1:
+        if not daemon.is_running():
             logger.warning(f"Daemon {daemon.name} [PID {daemon.PID}] is not running")
             return False
 
