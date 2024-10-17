@@ -1,0 +1,14 @@
+<Configuration>
+    <VGpu>Disable</VGpu>
+    <Networking>Enable</Networking>
+    <MappedFolders>
+        <MappedFolder>
+            <HostFolder>{{HOST_FOLDER}}</HostFolder>
+            <SandboxFolder>{{SANDBOX_FOLDER}}</SandboxFolder>
+            <ReadOnly>false</ReadOnly>
+        </MappedFolder>
+    </MappedFolders>
+    <LogonCommand>
+        <Command>{{COMMAND}}</Command>
+    </LogonCommand>
+</Configuration>

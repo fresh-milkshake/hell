@@ -2,15 +2,14 @@ import asyncio
 import os
 import signal
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
-import psutil
 import yaml
 from loguru import logger
 
+from app import settings
 from app.manager import utils, constants
-from app.manager.daemon import Daemon
-from app.manager.enums import DaemonStatus
+from ..daemon import Daemon, Config
 
 
 @utils.singleton
@@ -18,15 +17,13 @@ class Hell:
     """Class "Manager" for daemons deployment and killing"""
 
     def __init__(self) -> None:
-        self.__config = None
-        self.__daemons: List[Daemon] = []
-        self.__auto_restart_list: List[Daemon] = []
-        self.__pending_for_restart: List[Daemon] = []
-        self.__running_daemons: List[Daemon] = []
+        self._daemons_mapping: Dict[str, Daemon] = {}
+        self._config = None
+        self._pending_for_restart: List[Daemon] = []
         self.running = False
         self.start_time = None
 
-        self.__watcher_task = None
+        self._watcher_task = None
 
     async def stop(self) -> Tuple[bool, str]:
         """
@@ -40,23 +37,23 @@ class Hell:
             return False, "System is not running"
 
         self.running = False
-        if self.__watcher_task:
+        if self._watcher_task:
             logger.info("Stopping daemons polling task...")
-            self.__watcher_task.cancel()
-            await self.__watcher_task
+            self._watcher_task.cancel()
+            await self._watcher_task
 
         logger.info("Stopping all running daemons...")
-        await self.__stop_all()
+        await self._stop_all()
 
         return True, "System stopped"
 
-    async def __stop_all(self) -> None:
+    async def _stop_all(self) -> None:
         """Kill all running daemons"""
         for daemon in self.get_running_daemons():
-            await self.__stop_daemon(daemon)
+            await daemon.stop()
 
         if not self.get_running_daemons():
-            logger.info("System killed all daemons")
+            logger.success("System killed all daemons")
         else:
             logger.warning(
                 f"System failed to kill {len(self.get_running_daemons())} daemon(s)"
@@ -64,17 +61,17 @@ class Hell:
 
             for daemon in self.get_running_daemons():
                 logger.error(
-                    f"| Daemon {daemon.name} [PID {daemon.PID}] failed to kill"
+                    f"| Daemon {daemon.config.name} [PID {daemon.get_pid()}] failed to kill"
                 )
 
-                utils.kill_by_signal(daemon.PID, signal.SIGTERM)
+                utils.kill_by_signal(daemon.get_pid(), signal.SIGTERM)
 
                 if daemon.is_running():
                     logger.error(
-                        f"| Daemon {daemon.name} [PID {daemon.PID}] failed to stop"
+                        f"| Daemon {daemon.config.name} [PID {daemon.get_pid()}] failed to stop"
                     )
                 else:
-                    logger.success(f"| Daemon {daemon.name} [PID {daemon.PID}] stopped")
+                    logger.success(f"| Daemon {daemon.config.name} [PID {daemon.get_pid()}] stopped")
 
     async def start(self) -> tuple[bool, str]:
         """
@@ -86,17 +83,17 @@ class Hell:
         self.__init__()
 
         self.running = True
-        self.__config = self.__load_config()
-        self.__update_constants(self.__config)
-        self.__load_daemons(self.__config)
+        self._config = self._load_config()
+        self._update_constants(self._config)
+        self._load_daemons(self._config)
 
         logger.info("Starting daemons...")
-        if not await self.__start_all():
+        if not await self._start_all():
             return False, "Can't start any daemon"
 
         try:
             task = asyncio.create_task(self.__check_daemons_state())
-            self.__watcher_task = task
+            self._watcher_task = task
         except Exception as e:
             logger.error(e)
             return False, "Can't start watcher"
@@ -120,33 +117,19 @@ class Hell:
 
     async def stop_daemon(self, daemon_name: str) -> bool:
         """Stops a daemon by name"""
-        daemon = self.search_daemon_by_name(daemon_name)
+        daemon = self._daemons_mapping[daemon_name]
+
         if not daemon:
             logger.error(f"Daemon {daemon_name} not found")
             return False
-        return await self.__stop_daemon(daemon)
 
-    @staticmethod
-    async def __stop_daemon(daemon: Daemon) -> bool:
-        if not daemon.is_running():
-            logger.warning(f"Daemon {daemon.name} [PID {daemon.PID}] is not running")
-            return False
         return await daemon.stop()
 
     async def start_daemon(self, daemon_name: str) -> bool:
         """Starts a daemon by name"""
-        daemon = self.search_daemon_by_name(daemon_name)
+        daemon = self._daemons_mapping[daemon_name]
         if not daemon:
             logger.error(f"Daemon {daemon_name} not found")
-            return False
-        return await self.__start_daemon(daemon)
-
-    @staticmethod
-    async def __start_daemon(daemon: Daemon) -> bool:
-        if daemon.is_running():
-            logger.warning(
-                f"Daemon {daemon.name} [PID {daemon.PID}] is already running"
-            )
             return False
         return await daemon.start()
 
@@ -156,36 +139,32 @@ class Hell:
         if not daemon:
             logger.error(f"Daemon {daemon_name} not found")
             return False
-        return await self.__restart_daemon(daemon)
-
-    async def __restart_daemon(self, daemon: Daemon) -> bool:
-        return await self.__stop_daemon(daemon) and await self.__start_daemon(daemon)
+        return await daemon.stop() and await daemon.start()
 
     def get_running_daemons(self) -> List[Daemon]:
-        return [daemon for daemon in self.__daemons if daemon.is_running()]
+        return [daemon for daemon in self._daemons_mapping.values() if daemon.is_running()]
 
     def get_stopped_daemons(self) -> List[Daemon]:
-        return [daemon for daemon in self.__daemons if not daemon.is_running()]
+        return [daemon for daemon in self._daemons_mapping.values() if not daemon.is_running()]
 
-    def get_all_daemons(self) -> List[Daemon]:
-        return self.__daemons
+    def get_all_daemons(self) -> list[Daemon]:
+        return list(self._daemons_mapping.values())
 
     async def __check_daemons_state(self):
         """Check the state of currently running daemons"""
         try:
             while True:
                 pending_for_restart = []
-                for daemon in self.__daemons:
+                for daemon in self._daemons_mapping.values():
                     if not daemon.is_running():
-                        logger.warning(f"Daemon {daemon.name} no longer running...")
-                        if daemon.restart_if_stopped:
-                            daemon.status = DaemonStatus.PENDING
+                        logger.warning(f"Daemon {daemon.config.name} no longer running...")
+                        if daemon.config.keep_running:
                             pending_for_restart.append(daemon)
 
                 for daemon in pending_for_restart:
-                    if daemon.failed_starts < constants.MAX_FAILED_STARTS:
-                        logger.info(f"Restarting daemon '{daemon.name}'...")
-                        await self.__start_daemon(daemon)
+                    if daemon.get_failed_starts() < constants.MAX_FAILED_STARTS:
+                        logger.info(f"Restarting daemon '{daemon.config.name}'...")
+                        await daemon.start()
 
                 if not self.get_running_daemons():
                     logger.warning("No daemons running...")
@@ -195,40 +174,15 @@ class Hell:
         except asyncio.CancelledError:
             return
 
-    def __log_daemons_data(self) -> None:
+    def _log_daemons_data(self) -> None:
         """Log a list of daemons"""
-        for daemon in self.__daemons:
-            daemon.log_information()
+        for daemon in self._daemons_mapping.values():
+            state = daemon.get_state()
+            message = str(state)
+            logger.debug(message)
 
     @staticmethod
-    def __find_daemons_processes(
-        path_prefix: str = str(constants.DAEMONS_PATH), only_pids: bool = True
-    ) -> List[int] | List[Tuple[int, str]]:
-        pids = []
-        for proc in psutil.process_iter(attrs=["pid", "name", "cmdline"]):
-            pinfo = proc.info
-            try:
-                if (
-                    pinfo["name"] == constants.CMD_PYTHON
-                    and len(pinfo["cmdline"]) > 1
-                    and pinfo["cmdline"][1].startswith(path_prefix)
-                ):
-                    pid = pinfo["pid"]
-                    file_path = pinfo["cmdline"][1]
-                    pids.append(pid if only_pids else (pid, file_path))
-            except psutil.NoSuchProcess:
-                continue
-            except psutil.AccessDenied:
-                logger.warning(f"Access denied for process {pinfo['pid']}")
-            except Exception as e:
-                logger.error(
-                    f"Unexpected error processing PID {pinfo['pid']}: {str(e)}"
-                )
-
-        return pids
-
-    @staticmethod
-    def __update_constants(config: dict) -> None:
+    def _update_constants(config: dict) -> None:
         """Updates global constants like DAEMONS_PATH and other based on config dict.
 
         Parameters for a global setting are:
@@ -245,7 +199,7 @@ class Hell:
         # Default value is False
         default-auto-restart: <true/false/True/False>
         """
-        constants.DAEMONS_PATH = config.get("daemons-path", constants.DAEMONS_PATH)
+        constants.DAEMONS_PATH = config.get("daemons-path", constants.DAEMONS_FOLDER_PATH)
         constants.DEFAULT_ARGUMENTS = config.get(
             "default-args", constants.DEFAULT_ARGUMENTS
         )
@@ -257,14 +211,14 @@ class Hell:
         )
 
     @staticmethod
-    def __load_config() -> dict:
+    def _load_config() -> dict:
         """Load the config file"""
-        if not os.path.exists(constants.DAEMONS_CONFIG_PATH):
+        if not constants.DAEMONS_CONFIG_PATH.exists():
             logger.critical(f"Config file not found at {constants.DAEMONS_CONFIG_PATH}")
             exit(1)
 
         with open(
-            constants.DAEMONS_CONFIG_PATH, "r", encoding=constants.GLOBAL_ENCODING
+                constants.DAEMONS_CONFIG_PATH, "r", encoding=settings.GLOBAL_ENCODING
         ) as file:
             config = yaml.safe_load(file)
 
@@ -275,7 +229,7 @@ class Hell:
         return config
 
     @staticmethod
-    def __create_daemon(name: str, config: dict) -> Daemon | None:
+    def _create_daemon(name: str, yaml_config: dict) -> Daemon | None:
         """Create a daemon from a given config dict.
 
         Parameters for a daemon in YAML format:
@@ -300,56 +254,55 @@ class Hell:
             virtualenv: <True/False/true/false>
         """
 
-        daemon_directory = config.get("dir", Path(name))
-        daemon_directory: Path = constants.DAEMONS_PATH / daemon_directory
+        daemon_directory = yaml_config.get("dir", Path(name))
+        daemon_directory: Path = constants.DAEMONS_FOLDER_PATH / daemon_directory
         if not daemon_directory.exists():
             logger.warning(f'Daemon directory "{daemon_directory}" not found')
             return None
 
-        target = config.get("target", constants.DEFAULT_TARGET_PATH)
+        target = yaml_config.get("target", constants.DEFAULT_TARGET_PATH)
         target: Path = daemon_directory / target
         if not target.exists():
             logger.critical(f"Target file {target} not found")
             return None
 
-        requirements: Path | str = config.get(
+        requirements = yaml_config.get(
             "requirements", constants.IGNORE_REQUIREMENTS_SETTING
         )
-        requirements_needed = True
-        if requirements != constants.IGNORE_REQUIREMENTS_SETTING:
-            if requirements == "default":
-                requirements = (
-                    constants.DAEMONS_PATH
-                    / daemon_directory
-                    / constants.DEFAULT_REQUIREMENTS_PATH
-                )
-            else:
-                requirements = constants.DAEMONS_PATH / daemon_directory / requirements
-
-            if not requirements.exists():
-                logger.warning(f'Requirements file "{requirements}" not found')
-                return None
+        if requirements == "default":
+            requirements = (
+                constants.DAEMONS_FOLDER_PATH
+                / daemon_directory
+                / constants.DEFAULT_REQUIREMENTS_PATH
+            )
+        elif requirements == constants.IGNORE_REQUIREMENTS_SETTING:
+            requirements = None
         else:
-            requirements_needed = False
+            requirements = constants.DAEMONS_FOLDER_PATH / daemon_directory / requirements
 
-        arguments = config.get("arguments", constants.DEFAULT_ARGUMENTS)
-        auto_restart = config.get("auto-restart", constants.DEFAULT_AUTO_RESTART)
-        use_venv = config.get("use-venv", constants.DEFAULT_USE_VIRTUAL_ENV)
+        if requirements and not requirements.exists():
+            logger.warning(f'Requirements file "{requirements}" not found')
+            return None
 
-        daemon = Daemon(
+        arguments = yaml_config.get("arguments", constants.DEFAULT_ARGUMENTS)
+        auto_restart = yaml_config.get("auto-restart", constants.DEFAULT_AUTO_RESTART)
+        use_venv = yaml_config.get("virtualenv", constants.DEFAULT_USE_VIRTUAL_ENV)
+
+        config_obj = Config(
             name=name,
-            project_folder=daemon_directory,
-            main_file=target,
-            main_file_arguments=arguments,
-            requirements_needed=requirements_needed,
-            requirements_path=requirements,  # type: ignore
-            restart_if_stopped=auto_restart,
-            use_virtualenv=use_venv,
+            daemon_parent_folder=constants.DAEMONS_FOLDER_PATH,
+            daemon_folder=daemon_directory,
+            requirements_path=requirements,
+            keep_running=auto_restart,
+            create_venv=use_venv,
+            main_file_path=target,
+            main_file_arguments=tuple(arguments)
         )
 
+        daemon = Daemon(config_obj, constants.DAEMONS_FOLDER_PATH)
         return daemon
 
-    def __load_daemons(self, config: dict) -> bool:
+    def _load_daemons(self, config: dict) -> bool:
         """Load daemons from a given path"""
 
         if not config["daemons"]:
@@ -358,12 +311,11 @@ class Hell:
 
         for daemon_name in config["daemons"]:
             daemon_config = config["daemons"][daemon_name]
-            daemon = self.__create_daemon(daemon_name, daemon_config)
+            daemon = self._create_daemon(daemon_name, daemon_config)
             if daemon is not None:
-                if self.__add_daemon(daemon) and daemon.restart_if_stopped:
-                    self.__auto_restart_list.append(daemon)
+                self._add_daemon(daemon)
 
-        count = len(self.__daemons)
+        count = len(self._daemons_mapping)
 
         if not count:
             logger.warning("System encountered problems while checking daemons data")
@@ -372,11 +324,11 @@ class Hell:
         logger.info(f"Loaded {count} daemons")
         return True
 
-    async def __start_all(self) -> bool:
+    async def _start_all(self) -> bool:
         """
         Start all daemons asynchronously
         """
-        if not self.__daemons:
+        if not self._daemons_mapping:
             logger.critical("No daemons loaded for deploying")
             return False
 
@@ -385,55 +337,34 @@ class Hell:
         async def start_daemon(daemon: Daemon):
             nonlocal errors
             try:
-                if await daemon.start():
-                    self.__running_daemons.append(daemon)
-                else:
+                if not await daemon.start():
                     errors += 1
             except Exception as e:
                 errors += 1
                 logger.error(f"Error starting daemon {daemon}: {e}")
 
-        tasks = [start_daemon(daemon) for daemon in self.__daemons]
+        tasks = [start_daemon(daemon) for daemon in self._daemons_mapping.values()]
         await asyncio.gather(*tasks)
 
         if errors == 0:
             logger.success(
-                f"System initialized and deployed all daemons ({len(self.__daemons)})"
+                f"System initialized and deployed all daemons ({len(self._daemons_mapping)})"
             )
         else:
             logger.info(
-                f"System encountered {errors} failure(s) and deployed {len(self.__daemons) - errors} daemon(s)"
+                f"System encountered {errors} failure(s) and deployed {len(self._daemons_mapping) - errors} daemon(s)"
             )
 
-        return errors < len(self.__daemons)
+        return errors < len(self._daemons_mapping)
 
-    def __add_daemon(self, daemon: Daemon) -> bool:
-        """Add a daemon to the list of daemons"""
-        if daemon.main_file in [d.main_file for d in self.__daemons]:
-            logger.error(f"Daemon {daemon.name} already exists")
+    def _add_daemon(self, daemon: Daemon) -> bool:
+        if daemon.config.main_file_path in [d.config.main_file_path for d in self._daemons_mapping.values()]:
+            logger.error(f"Daemon {daemon.config.name} already exists")
             return False
 
-        self.__daemons.append(daemon)
-        logger.success(f'Loaded "{daemon.name}" daemon')
+        self._daemons_mapping[daemon.config.name] = daemon
+        logger.success(f'Loaded "{daemon.config.name}" daemon')
         return True
 
-    def search_daemon_by_pid(self, pid: int) -> Daemon | None:
-        """Search a daemon by pid"""
-        for daemon in self.__daemons:
-            if daemon.PID == pid:
-                return daemon
-        return None
-
-    def search_daemon_by_file(self, file: Path) -> Daemon | None:
-        """Search a daemon by file"""
-        for daemon in self.__daemons:
-            if daemon.main_file == file:
-                return daemon
-        return None
-
     def search_daemon_by_name(self, name: str) -> Daemon | None:
-        """Search a daemon by name"""
-        for daemon in self.__daemons:
-            if daemon.name == name:
-                return daemon
-        return None
+        return self._daemons_mapping[name]

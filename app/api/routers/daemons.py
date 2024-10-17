@@ -15,7 +15,7 @@ router = APIRouter(
 
 def schema_from_daemon(daemon: Daemon):
     return schemas.DaemonData(
-        name=daemon.name,
+        name=daemon.daemon_name,
         directory=str(daemon.project_folder),
         main_file=str(daemon.main_file),
         requirements_path=str(daemon.requirements_path)
@@ -37,7 +37,7 @@ def schema_from_daemon(daemon: Daemon):
 
 @router.get("/", response_model=schemas.DaemonList)
 async def list_daemons(
-    hell: Hell = Depends(dependencies.get_hell_instance),
+        hell: Hell = Depends(dependencies.get_hell_instance),
 ):
     """List all daemons and their statuses"""
     daemons = hell.get_all_daemons()
@@ -50,7 +50,7 @@ async def list_daemons(
 
 @router.post("/{daemon_name}/start")
 async def start_daemon(
-    daemon: Daemon = Depends(dependencies.get_daemon),
+        daemon: Daemon = Depends(dependencies.get_daemon),
 ):
     """Start a specific daemon"""
     if daemon.start():
@@ -61,7 +61,7 @@ async def start_daemon(
 
 @router.post("/{daemon_name}/stop")
 async def stop_daemon(
-    daemon: Daemon = Depends(dependencies.get_daemon),
+        daemon: Daemon = Depends(dependencies.get_daemon),
 ):
     """Stop a specific daemon"""
     if daemon.stop():
@@ -72,7 +72,7 @@ async def stop_daemon(
 
 @router.post("/{daemon_name}/restart")
 async def restart_daemon(
-    daemon_name: str,
+        daemon_name: str,
 ):
     """Restart a specific daemon"""
     success, msg = await Hell().restart_daemon(daemon_name)

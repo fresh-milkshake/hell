@@ -9,3 +9,4 @@ peewee~=3.17.6
 rich~=13.9.2
 slowapi~=0.1.9
 starlette~=0.38.6
+watchdog~=5.0.3

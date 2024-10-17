@@ -1,7 +1,8 @@
 import platform
 import shutil
-import subprocess
-from subprocess import Popen, PIPE, TimeoutExpired
+from subprocess import PIPE, DEVNULL
+
+from psutil import Popen, TimeoutExpired
 from typing import Optional, Tuple, Union
 
 from loguru import logger
@@ -193,9 +194,9 @@ class Executor:
         try:
             process = Popen(
                 command_sequence.subcommands,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
+                stdout=DEVNULL,
+                stderr=DEVNULL,
+                stdin=DEVNULL,
                 close_fds=True,
                 shell=False,
             )

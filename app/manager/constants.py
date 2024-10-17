@@ -5,18 +5,6 @@ from pathlib import Path
 
 from loguru import logger
 
-
-class LogLevel:
-    TRACE = "TRACE"
-    DEBUG = "DEBUG"
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-    CRITICAL = "CRITICAL"
-
-
-# General settings
-GLOBAL_ENCODING = "utf-8"
 WATCHER_SLEEP_TIME = timedelta(seconds=1)
 MAX_FAILED_STARTS = 3
 
@@ -31,8 +19,10 @@ if WATCHER_SLEEP_TIME < timedelta(minutes=1):
 
 # Project paths
 PROJECT_PATH = Path(__file__).resolve().parent.parent.parent
-DAEMONS_CONFIG_PATH = PROJECT_PATH / "daemons.yaml"
-DAEMONS_PATH = PROJECT_PATH / "daemons"
+DAEMONS_CONFIG_NAME = "daemons.yaml"
+DAEMONS_CONFIG_PATH = PROJECT_PATH / DAEMONS_CONFIG_NAME
+DAEMONS_FOLDER_NAME = "daemons"
+DAEMONS_FOLDER_PATH = PROJECT_PATH / DAEMONS_FOLDER_NAME
 
 # Default settings
 DEFAULT_REQUIREMENTS_PATH = Path("requirements.txt")
@@ -42,15 +32,6 @@ DEFAULT_USE_VIRTUAL_ENV = False
 DEFAULT_VIRTUAL_ENV_NAME = Path("venv")
 DEFAULT_ARGUMENTS = ""
 IGNORE_REQUIREMENTS_SETTING = "-"
-
-# Logging settings
-LOG_LEVEL = LogLevel.DEBUG
-# "<cyan>{file: <15}</cyan>:<cyan>{line: <5}</cyan> | <cyan>{function: <25}</cyan> | "
-LOG_FORMAT_STRING = (
-    "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <level>{message}</level>"
-)
-LOG_FILE_NAME = "manager.log"
-LOG_FILE_PATH = PROJECT_PATH / LOG_FILE_NAME
 
 # Command settings
 CMD_TO_DEV_NULL = [">", "/dev/null"]
@@ -63,3 +44,5 @@ CMD_VENV_PIP_INSTALL = ["install", "-r"]
 
 WINDOWS_PYTHON_NAMES = ["python.exe", "python3.exe", "pythonw.exe", "python"]
 LINUX_PYTHON_NAMES = ["python3", "python"]
+
+WSB_TEMPLATE_PATH = PROJECT_PATH / "app" / "manager" / "isolation" / "wsb_template"

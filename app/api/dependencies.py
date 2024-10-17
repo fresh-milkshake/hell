@@ -33,10 +33,10 @@ def verify_token(api_key: str = Depends(api_key_header)):
 
 
 def get_daemon(
-    hell: Hell = Depends(get_hell_instance),
-    daemon_name: Optional[str] = None,
-    daemon_pid: Optional[int] = None,
-    daemon_file: Optional[Path] = None,
+        hell: Hell = Depends(get_hell_instance),
+        daemon_name: Optional[str] = None,
+        daemon_pid: Optional[int] = None,
+        daemon_file: Optional[Path] = None,
 ) -> Daemon:
     search_methods = [
         (daemon_name, hell.search_daemon_by_name),
