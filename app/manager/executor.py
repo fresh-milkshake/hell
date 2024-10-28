@@ -97,9 +97,10 @@ class Cmd:
         Returns:
             subprocess.Popen: A Popen object representing the process running a command.
         """
+
         return Executor().execute(
             self, show_output=show_output, timeout=timeout, blocking=False
-        )  # type: ignore
+        )
 
 
 @singleton

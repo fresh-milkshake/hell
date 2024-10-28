@@ -1,10 +1,10 @@
-import asyncio
 import platform
 import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, List
 
+import psutil
 from loguru import logger
 from psutil import Popen
 
@@ -85,7 +85,7 @@ class Daemon:
             cmd += constants.CMD_TO_DEV_NULL
 
         self._isolation_provider = IsolationProvider(self.config)
-        self._process = self._isolation_provider.run_in_sandbox(cmd)
+        self._process = self._isolation_provider.run_cmd(cmd)
 
         if not self.is_running():
             logger.error(
@@ -102,9 +102,13 @@ class Daemon:
     @running_required(True)
     async def stop(self) -> bool:
         """Kill the daemon, and return True if successful"""
-        self._process.kill()
-        self._process.terminate()
-        logger.critical(self._process.status())  # TODO: remove after testing
+        try:
+            self._process.kill()
+            self._process.terminate()
+        except psutil.NoSuchProcess:
+            logger.error(f"Failed to kill {self.config.name}, daemon is not running")
+            return True
+
         if not self.is_running():
             logger.success(f"Successfully killed {self.config.name} [PID {self._process.pid}]")
             return True
@@ -119,11 +123,21 @@ class Daemon:
         """
         Creates and returns state object
         """
+
+        try:
+            pid = self._process.pid
+            memory_mb = self._process.memory_info().rss / (1024 * 1024)
+            cpu_percent = self._process.cpu_percent(interval=1)
+        except psutil.NoSuchProcess:
+            pid = 0
+            memory_mb = 0.0
+            cpu_percent = 0.0
+
         return State(
-            running=self._process.is_running(),
-            pid=self._process.pid,
-            memory_mb=self._process.memory_info().rss / (1024 * 1024),
-            cpu_percent=self._process.cpu_percent(interval=1),
+            running=self.is_running(),
+            pid=pid,
+            memory_mb=memory_mb,
+            cpu_percent=cpu_percent,
             started_at=self._started_at,
             starts_count=self._starts_count,
             start_attempts=self._start_attempts,
@@ -179,7 +193,8 @@ class Daemon:
 
         if not self.config.requirements_path.exists():
             logger.warning(
-                f'Failed to install requirements for "{self.config.name}" because file "{self.config.requirements_path}" was not found'
+                f'Failed to install requirements for "{self.config.name}" because file '
+                f'"{self.config.requirements_path}" was not found'
             )
             return False
 
@@ -211,25 +226,3 @@ class Daemon:
             raise FileNotFoundError("Requirements file does not exist")
 
         return self.config.requirements_path.read_text().strip().splitlines()
-
-
-async def test():
-    config = Config(
-        name="test",
-        daemon_parent_folder=Path('.'),
-        requirements_path=Path("requirements.txt"),
-        keep_running=True,
-        create_venv=True,
-        main_file_path=Path("main.py"),
-        main_file_arguments=(),
-        git_repo_url=''
-    )
-
-    daemon = Daemon(config, Path('../../../daemons'))
-    await daemon.start()
-
-    print(sys.getsizeof(daemon), await daemon.get_state())
-
-
-if __name__ == '__main__':
-    asyncio.run(test())

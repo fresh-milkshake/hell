@@ -14,25 +14,7 @@ router = APIRouter(
 
 
 def schema_from_daemon(daemon: Daemon):
-    return schemas.DaemonData(
-        name=daemon.daemon_name,
-        directory=str(daemon.project_folder),
-        main_file=str(daemon.main_file),
-        requirements_path=str(daemon.requirements_path)
-        if daemon.requirements_path
-        else "None",
-        auto_restart=daemon.restart_if_stopped,
-        arguments=daemon.main_file_arguments,
-        use_virtualenv=daemon.use_virtualenv,
-        dependencies_installed=daemon.dependencies_installed,
-        deployed_once=daemon.deployed_once,
-        deployed_at=daemon.deployed_at,
-        virtualenv_path=str(daemon.virtualenv_path)
-        if daemon.virtualenv_path
-        else "None",
-        pid=daemon.PID,
-        status=daemon.status,
-    )
+    return schemas.DaemonData.from_daemon(daemon)
 
 
 @router.get("/", response_model=schemas.DaemonList)

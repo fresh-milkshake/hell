@@ -1,5 +1,4 @@
 import asyncio
-import os
 import signal
 from pathlib import Path
 from typing import List, Tuple, Dict
@@ -271,9 +270,9 @@ class Hell:
         )
         if requirements == "default":
             requirements = (
-                constants.DAEMONS_FOLDER_PATH
-                / daemon_directory
-                / constants.DEFAULT_REQUIREMENTS_PATH
+                    constants.DAEMONS_FOLDER_PATH
+                    / daemon_directory
+                    / constants.DEFAULT_REQUIREMENTS_PATH
             )
         elif requirements == constants.IGNORE_REQUIREMENTS_SETTING:
             requirements = None
@@ -341,7 +340,8 @@ class Hell:
                     errors += 1
             except Exception as e:
                 errors += 1
-                logger.error(f"Error starting daemon {daemon}: {e}")
+                logger.error(f'Error starting daemon {daemon.config.name}')
+                logger.exception(e)
 
         tasks = [start_daemon(daemon) for daemon in self._daemons_mapping.values()]
         await asyncio.gather(*tasks)

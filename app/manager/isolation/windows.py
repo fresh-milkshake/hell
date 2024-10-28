@@ -1,3 +1,7 @@
+import os
+from pathlib import Path
+
+from loguru import logger
 from psutil import Popen
 
 from ..constants import WSB_TEMPLATE_PATH
@@ -6,10 +10,23 @@ from ..executor import Cmd
 
 
 class WindowsIsolationProvider:
+    SANDBOX_EXE_PATH = Path(r"C:\Windows\system32\WindowsSandbox.exe")
+
     def __init__(self, config: Config):
         self.config = config
 
-    def run_in_sandbox(self, command: Cmd) -> Popen:
+    @staticmethod
+    def _check_windows_sandbox():
+        if WindowsIsolationProvider.SANDBOX_EXE_PATH.exists():
+            return True
+
+        for path in os.environ["PATH"].split(";"):
+            if os.path.isfile(os.path.join(path, "WindowsSandbox.exe")):
+                return True
+
+        return False
+
+    def _create_sandbox(self, command: Cmd):
         config_file = self.config.daemon_parent_folder / "config.wsb"
 
         if not WSB_TEMPLATE_PATH.exists():
@@ -33,3 +50,10 @@ class WindowsIsolationProvider:
             raise RuntimeError("Failed to start sandbox")
 
         return process
+
+    def run_cmd(self, command: Cmd) -> Popen:
+        if not self._check_windows_sandbox():
+            logger.warning("Attention! WindowsSandbox not found, process isolation will be disabled")
+            return command.execute_in_process()
+
+        return self._create_sandbox(command)
