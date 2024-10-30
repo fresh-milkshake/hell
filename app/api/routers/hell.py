@@ -11,17 +11,17 @@ async def start(request: Request):
     if Hell().running:
         return {"success": False, "msg": "Hell is already running"}
 
-    success, msg = await Hell().start()
+    success, msg = Hell().start()
     return {"success": success, "msg": msg}
 
 
 @router.post("/stop", dependencies=[Depends(hell_is_running)])
 async def stop(request: Request):
-    success, msg = await Hell().stop()
+    success, msg = Hell().stop()
     return {"success": success, "msg": msg}
 
 
 @router.post("/restart", dependencies=[Depends(hell_is_running)])
 async def restart(request: Request):
-    success, msg = await Hell().restart()
+    success, msg = Hell().restart()
     return {"success": success, "msg": msg}

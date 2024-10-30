@@ -24,7 +24,7 @@ class Hell:
 
         self._watcher_task = None
 
-    async def stop(self) -> Tuple[bool, str]:
+    def stop(self) -> Tuple[bool, str]:
         """
         Stops daemons polling task and all running daemons
 
@@ -39,17 +39,16 @@ class Hell:
         if self._watcher_task:
             logger.info("Stopping daemons polling task...")
             self._watcher_task.cancel()
-            await self._watcher_task
 
         logger.info("Stopping all running daemons...")
-        await self._stop_all()
+        self._stop_all()
 
         return True, "System stopped"
 
-    async def _stop_all(self) -> None:
+    def _stop_all(self) -> None:
         """Kill all running daemons"""
         for daemon in self.get_running_daemons():
-            await daemon.stop()
+            daemon.stop()
 
         if not self.get_running_daemons():
             logger.success("System killed all daemons")
@@ -72,7 +71,7 @@ class Hell:
                 else:
                     logger.success(f"| Daemon {daemon.config.name} [PID {daemon.get_pid()}] stopped")
 
-    async def start(self) -> tuple[bool, str]:
+    def start(self) -> tuple[bool, str]:
         """
         Starts daemons polling task and all daemons
 
@@ -87,7 +86,7 @@ class Hell:
         self._load_daemons(self._config)
 
         logger.info("Starting daemons...")
-        if not await self._start_all():
+        if not self._start_all():
             return False, "Can't start any daemon"
 
         try:
@@ -99,7 +98,7 @@ class Hell:
 
         return True, "Successfully started system"
 
-    async def restart(self, delay_sec: int = 0) -> Tuple[bool, str]:
+    def restart(self, delay_sec: int = 0) -> Tuple[bool, str]:
         """
         Restarts daemons polling task and all daemons
 
@@ -107,14 +106,17 @@ class Hell:
             Tuple[bool, str]: True if success, False if failed
         """
         logger.info("Restarting system...")
-        success, msg = await self.stop()
+        success, msg = self.stop()
         if not success:
             return False, msg
 
-        await asyncio.sleep(delay_sec)
-        return await self.start()
+        if delay_sec > 0:
+            import time
+            time.sleep(delay_sec)
+            
+        return self.start()
 
-    async def stop_daemon(self, daemon_name: str) -> bool:
+    def stop_daemon(self, daemon_name: str) -> bool:
         """Stops a daemon by name"""
         daemon = self._daemons_mapping[daemon_name]
 
@@ -122,23 +124,23 @@ class Hell:
             logger.error(f"Daemon {daemon_name} not found")
             return False
 
-        return await daemon.stop()
+        return daemon.stop()
 
-    async def start_daemon(self, daemon_name: str) -> bool:
+    def start_daemon(self, daemon_name: str) -> bool:
         """Starts a daemon by name"""
         daemon = self._daemons_mapping[daemon_name]
         if not daemon:
             logger.error(f"Daemon {daemon_name} not found")
             return False
-        return await daemon.start()
+        return daemon.start()
 
-    async def restart_daemon(self, daemon_name: str) -> bool:
+    def restart_daemon(self, daemon_name: str) -> bool:
         """Restarts a daemon by name"""
         daemon = self.search_daemon_by_name(daemon_name)
         if not daemon:
             logger.error(f"Daemon {daemon_name} not found")
             return False
-        return await daemon.stop() and await daemon.start()
+        return daemon.stop() and daemon.start()
 
     def get_running_daemons(self) -> List[Daemon]:
         return [daemon for daemon in self._daemons_mapping.values() if daemon.is_running()]
@@ -163,7 +165,7 @@ class Hell:
                 for daemon in pending_for_restart:
                     if daemon.get_failed_starts() < constants.MAX_FAILED_STARTS:
                         logger.info(f"Restarting daemon '{daemon.config.name}'...")
-                        await daemon.start()
+                        daemon.start()
 
                 if not self.get_running_daemons():
                     logger.warning("No daemons running...")
@@ -198,7 +200,7 @@ class Hell:
         # Default value is False
         default-auto-restart: <true/false/True/False>
         """
-        constants.DAEMONS_PATH = config.get("daemons-path", constants.DAEMONS_FOLDER_PATH)
+        constants.DAEMONS_FOLDER_PATH = config.get("daemons-path", constants.DAEMONS_FOLDER_PATH)
         constants.DEFAULT_ARGUMENTS = config.get(
             "default-args", constants.DEFAULT_ARGUMENTS
         )
@@ -323,9 +325,9 @@ class Hell:
         logger.info(f"Loaded {count} daemons")
         return True
 
-    async def _start_all(self) -> bool:
+    def _start_all(self) -> bool:
         """
-        Start all daemons asynchronously
+        Start all daemons
         """
         if not self._daemons_mapping:
             logger.critical("No daemons loaded for deploying")
@@ -333,18 +335,14 @@ class Hell:
 
         errors = 0
 
-        async def start_daemon(daemon: Daemon):
-            nonlocal errors
+        for daemon in self._daemons_mapping.values():
             try:
-                if not await daemon.start():
+                if not daemon.start():
                     errors += 1
             except Exception as e:
                 errors += 1
                 logger.error(f'Error starting daemon {daemon.config.name}')
                 logger.exception(e)
-
-        tasks = [start_daemon(daemon) for daemon in self._daemons_mapping.values()]
-        await asyncio.gather(*tasks)
 
         if errors == 0:
             logger.success(

@@ -56,7 +56,7 @@ class Daemon:
         return decorator
 
     @running_required(False)
-    async def start(self) -> bool:
+    def start(self) -> bool:
         """Deploy the daemon, and return True if successful"""
         logger.info(f"Starting {self.config.name}...")
         self._start_attempts += 1
@@ -100,7 +100,7 @@ class Daemon:
         return True
 
     @running_required(True)
-    async def stop(self) -> bool:
+    def stop(self) -> bool:
         """Kill the daemon, and return True if successful"""
         try:
             self._process.kill()

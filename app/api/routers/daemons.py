@@ -17,8 +17,11 @@ def schema_from_daemon(daemon: Daemon):
     return schemas.DaemonData.from_daemon(daemon)
 
 
-@router.get("/", response_model=schemas.DaemonList)
-async def list_daemons(
+@router.get(
+    "/",
+    response_model=schemas.DaemonList
+)
+def list_daemons(
         hell: Hell = Depends(dependencies.get_hell_instance),
 ):
     """List all daemons and their statuses"""
@@ -31,7 +34,7 @@ async def list_daemons(
 
 
 @router.post("/{daemon_name}/start")
-async def start_daemon(
+def start_daemon(
         daemon: Daemon = Depends(dependencies.get_daemon),
 ):
     """Start a specific daemon"""
@@ -42,7 +45,7 @@ async def start_daemon(
 
 
 @router.post("/{daemon_name}/stop")
-async def stop_daemon(
+def stop_daemon(
         daemon: Daemon = Depends(dependencies.get_daemon),
 ):
     """Stop a specific daemon"""
@@ -53,9 +56,10 @@ async def stop_daemon(
 
 
 @router.post("/{daemon_name}/restart")
-async def restart_daemon(
+def restart_daemon(
         daemon_name: str,
+        hell: Hell = Depends(dependencies.get_hell_instance),
 ):
     """Restart a specific daemon"""
-    success, msg = await Hell().restart_daemon(daemon_name)
+    success = hell.restart_daemon(daemon_name)
     return {"success": success, "message": msg}
